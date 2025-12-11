@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd">
+	<http:request-config name="HTTP_Request_configuration_associate_service" doc:name="HTTP Request configuration" doc:id="0507bfc8-5256-4b3a-81cb-dccd1f28e380" responseTimeout="${associateService.responseTimeout}">
+		<http:request-connection host="${associateService.host}" port="${associateService.port}" connectionIdleTimeout="${associateService.connectionTimeout}" protocol="HTTPS" maxConnections="${associateService.maxConnections}"/>
+	</http:request-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="cae4788c-2759-4469-b769-743a8f72dfeb" file="config/${mule.env}.yaml" />
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="1ff1181e-edb1-4685-aec9-72ba79a18aa2">
+		<salesforce:oauth-client-credentials-connection >
+			<reconnection >
+				<reconnect frequency="${sf.reconnection.frequency}" count="${sf.reconnection.retries}" />
+			</reconnection>
+			<salesforce:oauth-client-credentials clientId="${sf.clientId}" clientSecret="${secure::sf.clientSecret}" tokenUrl="${sf.url}" />
+		</salesforce:oauth-client-credentials-connection>
+	</salesforce:sfdc-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="615a1da6-2c44-4dac-bf91-a5281625b4d0" file="config/common.yaml" />
+	<os:object-store name="Object_store_syncStatus" doc:name="Object store" doc:id="44957c3e-a952-4669-a8d0-16d4523191f5" entryTtl="${syncStatus.entryTTL}" expirationInterval="${syncStatus.expirationInterval}" entryTtlUnit="HOURS" expirationIntervalUnit="HOURS"/>
+	<http:request-config name="HTTP_Request_configuration_Graph_Sys_Api" doc:name="HTTP Request configuration" doc:id="8181c3b2-35ef-4efb-aa80-e1df17bf4acd" responseTimeout="${graphAPI.request.responseTimeout}">
+		<http:request-connection host="${graphAPI.host}" protocol="HTTPS" port="${graphAPI.port}" maxConnections="${graphAPI.request.maxConnections}" connectionIdleTimeout="${graphAPI.request.connectionIdleTimeout}"/>
+	</http:request-config>
+	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="f77a628c-a011-4987-9744-f96869a84897" file="config/secured/${mule.env}.yaml" key="${mule.key}" />
+</mule>

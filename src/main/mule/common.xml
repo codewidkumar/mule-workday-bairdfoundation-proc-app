@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<sub-flow name="sf-check-job-status" doc:id="4e2a664b-efe3-4c9b-ac87-bd3ceb1a238c" >
+		<foreach doc:name="For Each" doc:id="6eea3542-2d97-419a-aecc-9a7ec26067f3" collection="#[vars.jobIds]" >
+			<ee:transform doc:name="Set JobId and error flag" doc:id="a36432be-afaa-4a2b-8612-42600a92f977" >
+				<ee:message />
+				<ee:variables >
+					<ee:set-variable variableName="jobId" ><![CDATA[payload]]></ee:set-variable>
+					<ee:set-variable variableName="isError" ><![CDATA[false as Boolean]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<until-successful maxRetries="${worker.batchJobStatus.retries}" doc:name="Until Successful" doc:id="d961c124-0a96-44da-8c4a-364451b6e825" millisBetweenRetries="${worker.batchJobStatus.retryTime}" >
+				<salesforce:get-job-state-bulk-api-v2 doc:name="Get job state bulk api v2" doc:id="8b648c15-a055-43f0-8e43-8c8c1dafd37a" config-ref="Salesforce_Config" id="#[vars.jobId]" />
+				<choice doc:name="Check Job State" doc:id="021338d1-5f07-45ab-8991-6a3f3e0ade19" >
+					<when expression='#[payload.state == "JobComplete"]' >
+						<salesforce:retrieve-job-failed-results-bulk-v2 doc:name="Retrieve job failed results bulk v2" doc:id="3f130cc3-2192-4464-b290-d8ebe6b0dbd2" config-ref="Salesforce_Config" id="#[vars.jobId]" />
+						<choice doc:name="Check If Payload Not Empty" doc:id="0ffd2952-e808-437f-ae46-2b622288b11c" >
+							<when expression="#[sizeOf(payload) &gt; 0]" >
+								<ee:transform doc:name="Set failedRecords" doc:id="fb511cb0-0f6c-4adb-8642-881032c01dec" >
+									<ee:message />
+									<ee:variables >
+										<ee:set-variable variableName="failedRecords" ><![CDATA[%dw 2.0
+output application/json
+---
+payload ++ vars.failedRecords
+]]></ee:set-variable>
+									</ee:variables>
+								</ee:transform>
+								<logger level="WARN" doc:name="INFO: Log Info" doc:id="e79849f8-b278-41b9-9446-ca7535b0e59f" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Successfully upserted records with some errors to Salesforce for JobId: &quot; ++ vars.jobId,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: vars.businessKey&#10;}]" />
+							</when>
+							<otherwise >
+								<logger level="INFO" doc:name="INFO: Log Info" doc:id="ea38a9b7-0911-4b5b-aa80-767a72dbf244" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Successfully upserted records with no errors to Salesforce for JobId: &quot; ++ vars.jobId,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: vars.businessKey&#10;}]" />
+							</otherwise>
+						</choice>
+					</when>
+					<when expression='#[payload.state == "Failed" or payload.state == "Aborted"]' >
+						<logger level="INFO" doc:name="INFO: Log Info" doc:id="a0b4e13d-a0c6-4194-aa0f-1b0339bb6fc1" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Upsert Failed to Salesforce for JobId: &quot; ++ vars.jobId,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: vars.businessKey&#10;}]" />
+						<set-variable value="#[true as Boolean]" doc:name="Set isError" doc:id="0149df01-bfb6-4373-aeb7-cf24361160c9" variableName="isError" />
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="INFO: Log Info" doc:id="7fddfb3c-d4ef-44bc-8d26-755f067adb97" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Job Status is InProgress in Salesforce for JobId: &quot; ++ vars.jobId,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: vars.businessKey&#10;}]" />
+						<raise-error doc:name="Raise Error Job Not Completed" doc:id="2a4c740c-1932-4a8a-b5ec-4888428c92b0" type="JOB:NOT_COMPLETED" description="Job Not Completed" />
+					</otherwise>
+				</choice>
+			</until-successful>
+			<choice doc:name="Check For Error" doc:id="85a7ea04-4cee-4ca3-97b9-505c7f91486b" >
+				<when expression="#[vars.isError == true]">
+					<raise-error doc:name="Raise error Job Failed" doc:id="24ed086a-81b2-42d5-99e0-093c2400fed3" type="JOB:FAILED" description='#[output text/plain --- (payload.errorMessage ++ " JobID : " ++ (vars.jobId default "")) default ("Batch Job Failed for JobId: " ++ (vars.jobId default ""))]' />
+				</when>
+			</choice>
+		</foreach>
+	</sub-flow>
+	<sub-flow name="send-mail-graph-sys-api" doc:id="b500c564-f00a-4fdd-bdb1-8040a9406e54" >
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="c0c61a0e-febe-4099-8382-166bd15b76cb" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Sending Email Notification&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;EmailNotification&quot;&#10;}]" />
+		<until-successful maxRetries="${graphAPI.email.untilSuccessful.maxRetries}" doc:name="Until Successful" doc:id="8caa7dde-b1ca-40be-a24c-e4db9979f6b9" millisBetweenRetries="${graphAPI.email.untilSuccessful.interval}">
+			<try doc:name="Try" doc:id="41777c4a-8e07-4326-b6e6-8a3b5be00269" >
+				<http:request method="${graphAPI.email.method}" doc:name="POST  /send-email  Graph System API" doc:id="47efd9ab-973a-442a-bbc6-5b30de89db68" config-ref="HTTP_Request_configuration_Graph_Sys_Api" path="${graphAPI.email.path}">
+					<http:headers ><![CDATA[#[output application/java
+---
+{
+	"x-transactionId" : correlationId,
+	"client_secret": p('secure::graphAPI.clientSecret'),
+	"client_id": p('graphAPI.clientId'),
+	"source": "WorkdaySalesforceSyncApplication",
+	"x-msg-timestamp": (now() >> "America/Chicago") as String
+}]]]></http:headers>
+					<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"userId" : p('email.userId')
+}]]]></http:uri-params>
+				</http:request>
+				<error-handler >
+					<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="d9cb39dc-ec57-4fb3-a717-ffe8157d1c87" type="ANY" >
+						<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="f040a8f0-43cc-4269-88ca-3631c83b85ce" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description default &quot;Something went wrong. Please contact support.&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;EmailNotification&quot;&#10;}]" />
+					</on-error-propagate>
+				</error-handler>
+			</try>
+		</until-successful>
+	</sub-flow>
+</mule>

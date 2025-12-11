@@ -1,0 +1,126 @@
+trigger:
+  batch: true
+  branches:
+    include:
+      - dev
+  paths:
+    exclude:
+    - azure-pipelines.yml
+
+pr:
+  branches:
+    include:
+    - dev
+
+  paths:
+    exclude:
+    - azure-pipelines.yml
+
+parameters:
+  - name: environment
+    type: string
+    default: 'Dev'
+    values:
+      - Dev
+
+
+stages:
+  - stage: Build
+    displayName: 'Build MuleSoft Application'
+    jobs:
+      - job: Build
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: DownloadSecureFile@1
+            name: settingsFile
+            inputs:
+              secureFile: 'settings.xml'
+          - task: PowerShell@2
+            displayName: Copy settings file to .m2 folder
+            inputs:
+              targetType: 'inline'
+              script: |
+                New-Item -Type Directory -Force "${HOME}/.m2"
+                Copy-Item -Force "$(settingsFile.secureFilePath)" "${HOME}/.m2/settings.xml"
+          - task: Maven@3
+            displayName: 'Clean Package'
+            condition: ne( variables['Build.SourceBranchName'], 'dev' )
+            inputs:
+              mavenPomFile: 'pom.xml'
+              goals: 'clean package'
+              options: '-s $(settingsFile.secureFilePath) -DconnectorProvider=http -DskipTests=true'
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: '17'
+              mavenVersionOption: 'Default'
+              publishJUnitResults: false
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+
+  - stage: DeployToDev
+    displayName: 'Deploy to CloudHub 2.0 ${{ parameters.environment }} environment'
+    dependsOn: Build
+    condition: succeeded()
+    variables:
+      - group: 'vg-mule-workday-bairdfoundation-proc-app-dev'
+      - name: MAVEN_OPTS
+        value: "-Dmaven.repo.local=$(Pipeline.Workspace)/.m2/repository  --add-opens java.base/sun.net.www.protocol.https=ALL-UNNAMED"
+
+    jobs:
+      - job: Deploy
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: DownloadSecureFile@1
+            name: settingsFile
+            inputs:
+              secureFile: 'settings.xml'
+          - task: Maven@3
+            displayName: Publish to exchange
+            condition: eq( variables['Build.SourceBranchName'], 'dev' )
+            inputs:
+              mavenPomFile: 'pom.xml'
+              mavenOptions: '-Xmx3072m'
+              jdkVersionOption: '17'
+              jdkArchitectureOption: 'x64'
+              mavenAuthenticateFeed: true
+              publishJUnitResults: false
+              javaHomeOption: 'JDKVersion'
+              mavenVersionOption: 'Default'
+              effectivePomSkip: true
+              sonarQubeRunAnalysis: false
+              goals: 'deploy -DskipTests=true -Dserver=$(SERVER) -Denvironment=$(ENV) -Dtarget=$(ANYPOINT_TARGET) -DbusinessGroupId=$(ANYPOINT_BUSINESS_GROUP_ID) -Dapp.name=$(APP_NAME)-$(MULE_ENV) -Dreplicas=$(REPLICAS) -DvCores=$(VCORES) -Dmule.key=$(DECRYPTION_KEY) -DgenerateDefaultPublicUrl=$(GENERATE_DEFAULT_PUBLIC_URL) -Dclustered=$(CLUSTERED) -DskipDeploymentVerification=$(SKIP_DEPLOYMENT_VERIFICATION) -DreleaseChannel=$(RELEASE_CHANNEL) -DforwardSslSession=$(FORWARD_SSL_SESSION) -DlastMileSecurity=$(LAST_MILE_SECURITY)'
+              options: >
+                -s $(settingsFile.secureFilePath)  
+                -DskipTests=true
+                -Dmule.env=$(MULE_ENV)
+                -Danypoint.environment=${{ parameters.environment }}
+                -Danypoint.client.id=$(ANYPOINT_CLIENT_ID)
+                -Danypoint.client.secret=$(ANYPOINT_CLIENT_SECRET)
+                -Danypoint.business.group=$(ANYPOINT_BUSINESS_GROUP)
+                -Danypoint.connected.app.client.id=$(CONNECTED_APP_CLIENT_ID)
+                -Danypoint.connected.app.client.secret=$(CONNECTED_APP_CLIENT_SECRET)
+          - task: Maven@3
+            displayName: Deploy to runtime manager
+            condition: eq( variables['Build.SourceBranchName'], 'dev' )
+            inputs:
+              mavenPomFile: 'pom.xml'
+              mavenOptions: '-Xmx3072m'
+              jdkVersionOption: '17'
+              jdkArchitectureOption: 'x64'
+              mavenAuthenticateFeed: true
+              publishJUnitResults: false
+              javaHomeOption: 'JDKVersion'
+              mavenVersionOption: 'Default'
+              effectivePomSkip: true
+              sonarQubeRunAnalysis: false
+              goals: 'deploy -DmuleDeploy -DskipTests=true -Dserver=$(SERVER) -Denvironment=$(ENV) -Dtarget=$(ANYPOINT_TARGET) -DbusinessGroupId=$(ANYPOINT_BUSINESS_GROUP_ID) -Dapp.name=$(APP_NAME)-$(MULE_ENV) -Dreplicas=$(REPLICAS) -DvCores=$(VCORES) -Dmule.key=$(DECRYPTION_KEY) -DgenerateDefaultPublicUrl=$(GENERATE_DEFAULT_PUBLIC_URL) -Dclustered=$(CLUSTERED) -DskipDeploymentVerification=$(SKIP_DEPLOYMENT_VERIFICATION) -DreleaseChannel=$(RELEASE_CHANNEL) -DforwardSslSession=$(FORWARD_SSL_SESSION) -DlastMileSecurity=$(LAST_MILE_SECURITY)'
+              options: >
+                -s $(settingsFile.secureFilePath) 
+                -DskipTests=true
+                -Dmule.env=$(MULE_ENV)
+                -Danypoint.environment=${{ parameters.environment }}
+                -Danypoint.client.id=$(ANYPOINT_CLIENT_ID)
+                -Danypoint.client.secret=$(ANYPOINT_CLIENT_SECRET)
+                -Danypoint.business.group=$(ANYPOINT_BUSINESS_GROUP)
+                -Danypoint.connected.app.client.id=$(CONNECTED_APP_CLIENT_ID)
+                -Danypoint.connected.app.client.secret=$(CONNECTED_APP_CLIENT_SECRET)

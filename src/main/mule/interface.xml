@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<flow name="baird-workday-sf-sync-prc-apiFlow" doc:id="11f9f00d-a4f3-4c2c-9583-e6b3a0eb4f9a" >
+		<scheduler doc:name="Workday Salesforce Daily Sync" doc:id="3d0369dc-65fb-4d09-bc71-13e81734a069" >
+			<scheduling-strategy >
+				<cron expression="${workdaySalesforce.cron}" />
+			</scheduling-strategy>
+		</scheduler>
+		<set-variable value="#[now() as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set correlationId" doc:id="32f5acb4-136b-4a77-82a1-d286b9fd4786" variableName="correlationId"/>
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="cb4e7c2b-3b80-4677-abf0-d7f7bc8b2f67" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Starting Workday to Salesforce sync&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now()&#10;}]"/>
+		<os:retrieve doc:name="Retrieve Previous Sync State" doc:id="aa7c0efa-acb0-4a8b-81f0-89204ffe9930" key='#["syncState"]' target="syncState" objectStore="Object_store_syncStatus">
+			<os:default-value ><![CDATA[#["Stopped"]]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Check Completion of previous sync" doc:id="05d5b5b6-ddb4-47de-b240-381856767199" >
+			<when expression='#[vars.syncState == "Stopped"]'>
+				<logger level="INFO" doc:name="INFO: Log Info" doc:id="8937c331-6a6e-4565-989b-12cc736a9eff" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Syncing from Workday to Salesforce initiaited&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now()&#10;}]" />
+				<os:store doc:name="Set Current Sync State" doc:id="23c1d8bf-164e-4a5e-a409-ed85bea66d37" key="syncState" objectStore="Object_store_syncStatus">
+					<os:value ><![CDATA[#["Running"]]]></os:value>
+				</os:store>
+				<flow-ref doc:name="flow-reference to workday-bu-sf-sync" doc:id="1f7e95d6-58cd-47cb-a343-7716e2a5eba6" name="workday-bu-sf-sync" />
+				<flow-ref doc:name="flow-reference to workday-workers-sf-sync" doc:id="e2b71afe-2249-4672-9fb5-af672d86e775" name="workday-workers-sf-sync" />
+				<flow-ref doc:name="flow-reference to workday-contacts-sf-sync" doc:id="1130ea65-9d66-44c5-9540-4e04ff6270e9" name="workday-contacts-sf-sync" />
+				<os:store doc:name="Set Current Sync State" doc:id="b69d821f-4657-4081-bee0-a0cc56acef51" key="syncState" objectStore="Object_store_syncStatus">
+			<os:value><![CDATA[#["Stopped"]]]></os:value>
+		</os:store>
+			
+</when>
+			<otherwise >
+				<logger level="INFO" doc:name="INFO: Log Entry" doc:id="2b378c70-6315-4e37-9897-fb29e1cdabcb" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Previous sync still running, skipping the current task&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now()&#10;}]" />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="0bb4fc94-01fb-45ff-9bb8-463b0d4b7bce" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Sync completed updating the sync status&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now()&#10;}]" />
+		<remove-variable doc:name="Remove correlationId" doc:id="fb463d20-8b99-4f37-a279-be04730180d9" variableName="correlationId"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="5f0a6312-adab-481f-8e30-a69d752f139f" >
+				<logger level="INFO" doc:name="INFO: Log Entry" doc:id="7ce1acbf-cdb4-40b5-ba7f-19df75e36e71" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Error encountered , setting sync state as stopped&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now()&#10;}]" />
+				<os:store doc:name="Set Current Sync State" doc:id="fccadc0e-24eb-49d3-ac64-cedd2d8d6393" key="syncState" objectStore="Object_store_syncStatus" >
+					<os:value ><![CDATA[#["Stopped"]]]></os:value>
+				</os:store>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>

@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<flow name="workday-contacts-sf-sync" doc:id="eeea5578-4802-4080-b3f7-f60dc74752bb" >
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="b7e30a08-1470-4237-9f90-ceb815a07c0c" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Before starting validation and contact sync subflow&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now(),&#10;   	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]"/>
+		<flow-ref doc:name="Flow Reference to baird-workday-contact-sync-subflow" doc:id="21c07776-a3b4-4843-a92f-b23c98171ea4" name="baird-workday-contact-sync-subflow"/>
+		<logger level="DEBUG" doc:name="DEBUG: Log Contact details" doc:id="aae3d158-06b7-46df-90b5-284dac8d0afb" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Before syncing contact details&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;,&#10;   	&quot;Payload&quot;: payload&#10;}]" category="contacts.sync"/>
+		<flow-ref doc:name="Flow Reference to sync-contacts-to-sf-subflow" doc:id="70526ab5-9a19-40f9-9ba8-b720772c5a2a" name="sync-contacts-to-sf-subflow"/>
+		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="59824414-84fb-4a2f-a0e7-804616d9f4cf" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;After contacts are synced&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]"/>
+		<error-handler>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="184525d1-f42f-49b3-940e-e4f564cef69d" type="ANY" >
+				<logger level="ERROR" doc:name="ERROR: Log ERROR" doc:id="0b25b01d-bfa8-4453-b19d-d20fdc554e9b" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description,&#10;	&quot;CorrelationId&quot;: correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;}]" />
+				<ee:transform doc:name="Email payload" doc:id="a29b5813-b35e-4d14-986b-7cc776cd7d2c" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+output application/json
+var errorDescription = if(vars.errorObject == null) (error.description default "Internal Server Error") else vars.errorObject.description
+---
+{
+	"to": p('email.supportTeam.to'),
+	"subject": p('email.error.subject') ++ vars.correlationId,
+	"body": p('email.error.body') ++ error.description ++ "\nCorrelationId: " ++ vars.correlationId ++ "\nTimeStamp: " ++ now() ++"\n\nRegards,\nMulesoft Application\n",
+	"cc": p('email.supportTeam.cc'),
+	"attachments": []
+}
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Flow Reference to send-mail-graph-sys-api" doc:id="e0a217f2-c3a5-453e-8859-7e4ec3c8bac3" name="send-mail-graph-sys-api" />
+				<os:store doc:name="Set Current Sync State" doc:id="39729b61-065b-4a92-85b1-aed725ffb7d4" key="syncState" objectStore="Object_store_syncStatus" >
+					<os:value ><![CDATA[#["Stopped"]]]></os:value>
+				</os:store>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<sub-flow name="baird-workday-contact-sync-subflow" doc:id="ac15351e-633c-42fd-9c7c-8e3ac5f2d6ee" >
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="e87be435-3883-40a3-978e-60f8164c4bfb" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Before starting contact validation subflow&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]"/>
+		<ee:transform doc:name="SF Queries And Variables" doc:id="8f107cbc-4bc7-4361-a84c-ef3d72058278" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="queries" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"recordTypeQuery" :"SELECT Id from RecordType where DeveloperName = 'Associate' and SobjectType = 'Contact'"
+}]]></ee:set-variable>
+				<ee:set-variable variableName="empIds" ><![CDATA[%dw 2.0
+output application/json
+---
+(vars.validWorkers.EmpId ++ vars.validWorkers.JobPositionDetail.SupervisorEmpId distinctBy $) filter $ != null]]></ee:set-variable>
+				<ee:set-variable variableName="empsContactDetails" ><![CDATA[[]]]></ee:set-variable>
+				<ee:set-variable variableName="bairdIds" ><![CDATA[%dw 2.0
+output application/json
+---
+(vars.validWorkers.BusinessUnitOrganization.Descriptor.Id distinctBy $) filter $ != null]]></ee:set-variable>
+				<ee:set-variable variableName="empsAccountsDetails" ><![CDATA[[]]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<salesforce:query doc:name="Fetch RecordTypeID from RecordType" doc:id="b27b29e6-7411-42b7-82a2-72bbeafac3aa" config-ref="Salesforce_Config" target="recordTypeId">
+			<salesforce:salesforce-query ><![CDATA[#[vars.queries.recordTypeQuery]]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<flow-ref doc:name="emp-sf-id-mapping-subflow" doc:id="379cc0d4-f32d-4db0-bb3e-b9d40fa0b08e" name="emp-sf-id-mapping-subflow"/>
+		<flow-ref doc:name="baird-sf-id-mapping-subflow" doc:id="eff637c2-aea4-4ff9-b87a-3e997df90054" name="baird-sf-id-mapping-subflow"/>
+		<salesforce:query doc:name="Query All User EmployeesData" doc:id="46806826-c894-483c-886d-11952d4bfe68" config-ref="Salesforce_Config" target="userEmployeeNumbers" targetValue="#[output application/json&#10;---&#10;payload]">
+			<ee:repeatable-file-store-iterable inMemoryObjects="5000" />
+			<salesforce:salesforce-query><![CDATA[Select Id, EmployeeNumber,ProfileId,UserRoleId,IsActive from User]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Contact Upsert SF Payload" doc:id="9ceb7be6-488b-4795-a54d-b20841e89e66">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+fun createString(str)=
+(trim (str filter ((item, index) -> item != null) joinBy " "))
+var empMappedIds = vars.empsContactDetails map ((item, index) ->
+    (item.EmpId) : (item.Id)
+)
+var accountMappedIds = vars.empsAccountsDetails map ((item, index) ->
+    (item.BUid) : (item.Id)
+)
+fun getPhone(data) = do{
+    var AreaCode = data.AreaCode
+    var ContactNumber = data.ContactNumber
+    ---
+    if(data != null  and AreaCode != null and ContactNumber != null) (AreaCode ++ "-" ++ ContactNumber)
+    else if(data !=null and AreaCode != null and ContactNumber == null) AreaCode
+    else if(data !=null and AreaCode == null and ContactNumber != null) ContactNumber
+    else "#N/A"
+}
+---
+(vars.validWorkers map ((item, index) ->
+{
+	"FirstName": item.FirstName  default null,
+	"LastName": item.LastName  default null,
+	"Suffix": item.Suffix  default "#N/A",
+	"Email": if ( (p('api.env') == "PROD")) (lower((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]))
+			 else (lower((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) ++ ".invalid"),
+	"Phone": getPhone((item.Phones filter($.TelecommunicationsNumberTypeCode == "WORK" and $.Type == "Landline"))[0]),
+	"Employee_ID__c": item.EmpId,
+	"MailingStreet": createString([item.Location.Address1,item.Location.Address2,item.Location.Address3,item.Location.Address4]) default "#N/A",
+	"MailingCity": item.Location.CityName default "#N/A",
+	"MailingPostalCode": item.Location.PostalCode  default "#N/A",
+	"MailingState": item.Location.StateAbbreviation  default "#N/A",
+	"MailingCountry": item.Location.CountryCode  default "#N/A",
+	"Title": item.ProfessionalTitleName  default "#N/A",
+	"Officer_Title__c": Mule::p('officerType'++"."++ (item.OfficerTitleCode)) default "#N/A",
+	"Preferred_Name__c": createString([item.PreferredLastName,item.PreferredFirstName,item.PreferredMiddleName]) default "#N/A",
+	"RecordTypeId": vars.recordTypeId.Id[0] default null,
+	"User__c": empMappedIds[item.EmpId][0] default "#N/A",
+	"Manager__c": do{
+		var userData = (vars.userEmployeeNumbers filter($.EmployeeNumber == item.JobPositionDetail.SupervisorEmpId))[0]
+		---
+		if ( (userData != null) and
+        (userData.IsActive == "true"))(empMappedIds[item.JobPositionDetail.SupervisorEmpId][0])
+        else "#N/A"
+	},
+	"GL_Code__c": item.EmployeeCostCenter default "#N/A",
+	"Active__c": item.EmploymentDetail.Active default null,
+	"Ethnic_Group__c": item.PersonalDetail.EthnicGroupName default "#N/A",
+	"Gender__c": item.PersonalDetail.GenderCode default "#N/A",
+	"Address_Floor__c": item.Location.Floor default "#N/A",
+	"Department_Name__c": item.Department.Name default "#N/A",
+    "OwnerId": do{
+		var userData = (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId))[0]
+		---
+		if ( (userData != null) and
+        (userData.IsActive == "true") and
+        (vars.licenseType[item.EmpId][0] != "Chatter") ) (userData.Id) else null
+	},
+	"Hire_Date__c": item.EmploymentDetail.HireDate default "#N/A",
+	"AccountId": accountMappedIds[item.BusinessUnitOrganization.Descriptor.Id][0] default null,
+	"Termination_Date__c": item.EmploymentDetail.TerminationDate default "#N/A"
+}
+)) filter $.User__c != null]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="22d37d9d-2bf1-4b41-b16a-e46d5e20e307" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Ending contact validation flow&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]"/>
+	
+</sub-flow>
+	<sub-flow name="emp-sf-id-mapping-subflow" doc:id="f4698d3e-c0b5-4631-91c9-fc87fd67d516" >
+		<foreach doc:name="FOR EACH in empIds " doc:id="2507378b-d6e9-4150-b96c-50eec0c7cc3d" collection="#[vars.empIds]" batchSize="${batch.empContacts}" >
+			<ee:transform doc:name="Select Query User" doc:id="7b3db90e-5373-4f86-a48b-d6afa99b8926" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"SELECT EmployeeNumber,Id FROM User Where EmployeeNumber IN ('" ++ (payload joinBy "','") ++ "')"]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<logger level="DEBUG" doc:name="DEBUG: Log Outbound" doc:id="f68991c4-07fd-434e-a13f-acbfc01d5abb" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Before fetching EmployeeNumber and Id from User Object&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;,&#10;	&quot;BatchNo&quot;: vars.counter default null,&#10;	&quot;BatchSize&quot;: p('batch.empContacts') default null,&#10;	&quot;Query&quot;: payload default null&#10;}]" category="contacts.sync"/>
+			<salesforce:query doc:name="Fetch EmpId And SF Ids" doc:id="c966c95a-1c84-4a78-a2dc-1ba21aa77c93" config-ref="Salesforce_Config" >
+				<salesforce:salesforce-query ><![CDATA[#[payload]]]></salesforce:salesforce-query>
+			</salesforce:query>
+			<logger level="DEBUG" doc:name="DEBUG: Log Inbound" doc:id="45f2b6ef-163e-4e7c-9fd1-eb5009d240d2" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;After fetching EmployeeNumber and Id from User Object&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;,&#10;	&quot;BatchNo&quot;: vars.counter default null,&#10;	&quot;BatchSize&quot;: p('batch.empContacts') default null,&#10;	&quot;SFResponse&quot;: (payload filter ((item, index) -&gt; item.Employee_ID__c != null)) map ((item, index) -&gt;&#10;{&#10;		&quot;EmpId&quot;: item.Employee_ID__c,&#10;		&quot;Id&quot;: item.Id&#10;	})&#10;}]" category="contacts.sync"/>
+			<ee:transform doc:name="Accumulate EmpData for further operations" doc:id="c7bf248b-0014-412b-83f4-14b12d25b4d0" >
+				<ee:message />
+				<ee:variables >
+					<ee:set-variable variableName="empsContactDetails" ><![CDATA[%dw 2.0
+output application/json
+---
+vars.empsContactDetails ++ ((payload filter ((item, index) -> item.EmployeeNumber != null) ) map ((item, index) ->
+{
+    "EmpId" : item.EmployeeNumber,
+    "Id" : item.Id
+}
+))]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+	</sub-flow>
+	<sub-flow name="baird-sf-id-mapping-subflow" doc:id="21b75c90-c77b-4470-a397-6bd11b8e0ab4" >
+		<foreach doc:name="FOR EACH in bairdIds" doc:id="089e8405-b4e7-44b4-86bc-d647b5a86430" collection="#[vars.bairdIds]" batchSize="${batch.empContacts}" >
+			<ee:transform doc:name="Select Query Account" doc:id="004a8541-447a-43c5-8444-38e3bc041d27" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"SELECT Id,Baird_BU_ID__c FROM Account WHERE Baird_BU_ID__c IN ('" ++
+(payload joinBy ("','")) ++ "')"
+]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<logger level="DEBUG" doc:name="DEBUG: Log Outbound" doc:id="01494bbb-03aa-4120-8dc2-3ffcdbf32314" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Before fetching Baird_BU_Id__c and Id from Account Object&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;,&#10;	&quot;BatchNo&quot;: vars.counter default null,&#10;	&quot;BatchSize&quot;: p('batch.empContacts') default null,&#10;	&quot;Query&quot;: payload default null&#10;}]" category="contacts.sync"/>
+			<salesforce:query doc:name="Fetch SF Account Id for Descriptor Ids" doc:id="9e72c927-1ece-48ba-8acf-6006de892287" config-ref="Salesforce_Config" >
+				<salesforce:salesforce-query ><![CDATA[#[payload]]]></salesforce:salesforce-query>
+			</salesforce:query>
+			<logger level="DEBUG" doc:name="DEBUG: Log Inbound" doc:id="6198f59a-00d7-4c52-a886-75fed3367bb7" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;After fetching Baird_BU_Id__c and Id from Account Object&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;,&#10;	&quot;BatchNo&quot;: vars.counter default null,&#10;	&quot;BatchSize&quot;: p('batch.empContacts') default null,&#10;	&quot;SFResponse&quot;: (payload filter ((item, index) -&gt; item.Baird_BU_ID__c != null)) map ((item, index) -&gt;&#10;{&#10;		&quot;BUid&quot;: item.Baird_BU_ID__c,&#10;		&quot;Id&quot;: item.Id&#10;	}&#10;)&#10;}]" category="contacts.sync"/>
+			<ee:transform doc:name="Accumulate EmpData for further operations" doc:id="73cc1027-7e04-463d-b61c-1bbd9c9fbb34" >
+				<ee:message />
+				<ee:variables >
+					<ee:set-variable variableName="empsAccountsDetails" ><![CDATA[%dw 2.0
+output application/json
+---
+vars.empsAccountsDetails ++ ((payload filter ((item, index) -> item.Baird_BU_ID__c != null) ) map ((item, index) ->
+{
+    "BUid" : item.Baird_BU_ID__c,
+    "Id" : item.Id
+}
+))]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+	</sub-flow>
+	
+	
+</mule>

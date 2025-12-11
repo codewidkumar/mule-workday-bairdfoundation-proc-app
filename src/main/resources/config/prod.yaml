@@ -1,0 +1,73 @@
+api:
+    env: "PROD"
+
+workdaySalesforce:
+    cron: "0 0 8 * * ? *" # everyday at 8am UTC
+
+sf:
+    clientId: "3MVG98XJQQAccJQfRBnZb9WW.G8D3k2TMRPi7ultiPgFvSDHVh29l4Yand_63CEzsVnH5_ijdBTkZQppeOfF_"
+    url: "https://bairdfoundation.my.salesforce.com/services/oauth2/token"
+    reconnection:
+        frequency: "2000"
+        retries: "5"
+
+associateService:
+    host: "bws.rwbaird.com"
+    port: "443"
+    clientId: "474ebd01-4509-4a7e-b2fa-2e780c9a2499"
+    connectionTimeout: "10000"
+    maxConnections: "-1"
+    responseTimeout: "60000"
+    token:
+        path: "/apis/oauth/accesstoken"
+        method: "POST"
+    workers:
+        path: "/apis/associates/v1/basicworkers"
+        method: "GET"
+    bu:
+        path: "/apis/associates/v1/businessunitorganizations"
+        method: "GET"
+
+
+graphAPI:
+    host: "mule-microsoft-graph-sys-api-prod-b5yvvk.internal-c0r4ly.usa-e2.cloudhub.io"
+    port: "443"
+    clientId: "11a5a5a1ee604d1c88e2075e0b7d82b6"
+
+groupId:
+    standardUser: "61ad3104-5630-4cd1-b09b-538f4d6cea6f"
+    adminUser: "a29e24b7-6c48-47df-a91d-61bce05a0c90"
+
+userName:
+    sandboxName: ""
+
+email:
+    userId: "d8a53564-1a50-433b-97f3-d64230d5b4d2"
+    supportTeam:
+      to: "spunia@rwbaird.com,AWolff@rwbaird.com,SKershner@rwbaird.com,rseeger@rwbaird.com,salesforcesupportteam@rwbaird.com"
+      cc: "KWiesner@rwbaird.com,SAlessi@rwbaird.com"
+    businessUsers:   
+      to: "spunia@rwbaird.com"
+      cc: "AWolff@rwbaird.com"
+    failedUsersRecords:
+        subject: "PROD | Users unable to be activated/created in the Baird Foundation Org | "
+        body: "Hello User,\n\nYou're receiving this notifiation during workers synchronization process.\nThe following Associate entries from Workday are missing required fields in Salesforce for the Baird Foundation.\n\nPlease find the attachment for more information/details.\n\nRegards,\nMulesoft Application"
+    invalidUsers:
+        subject: "PROD | Errors from Workday to Baird Foundation Salesforce | "
+        body: "Hello User,\n\nYou're receiving this notifiation during workers synchronization process.\nThe following Associate entries from Workday are missing required fields in Salesforce for the Baird Foundation.\n\nPlease find the attachment for more information/details.\n\nRegards,\nMulesoft Application\n"
+    error:
+        subject: "PROD | Errors from Workday to Baird Foundation Salesforce | "
+        body: "Hello User,\n\nYou're receiving this notifiation during Workday to Salesforce synchronization process.\nError Description:"
+    accounts:
+        subject: "PROD | Errors from Workday to Baird Foundation Salesforce"
+        body: "Hello, \n\nThe following Business Units from Workday are not being inserted into Salesforce for the Baird Foundation: Include a list of failed business unit ids and names.\n\nThanks & Regards,\nMuleSoft Team"
+    contacts:
+        subject: "PROD | Contacts unable to be upserted in the Baird Foundation Org | "
+        body: "Hello, \n\nThe following Contacts from Workday are not being upserted into Salesforce for the Baird Foundation: Include a list of failed contact EmployeeIds and Names.\n\nThanks & Regards,\nMuleSoft Team"
+    buDuplicates:
+        subject: "PROD | Errors from Workday to Baird Foundation Salesforce | "
+        body: "Hello,\n\nThe following Business Units from Workday have duplicate Ids and are not being inserted into Salesforce for the Baird Foundation.\n\nThanks & Regards,\nMuleSoft Team"
+        
+sfQuery:
+    recordTypeDevName: "Baird_Account"
+    sObjectTypeAccount: "Account"

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<flow name="sync-contacts-to-sf-subflow" doc:id="ea38fee3-fac7-4e54-8549-eb223906d943" initialState="started">
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="d05d795e-9a99-4495-9156-41dd20c8ba58" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Sync Contacts Flow Started&quot;,&#10;	&quot;Total Records&quot;: sizeOf(payload) default 0,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]" />
+		<ee:transform doc:name="Initilizing Variables" doc:id="4aa103bf-3220-4dad-a110-da930dbf6826" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="successRecords" ><![CDATA[%dw 2.0
+output application/json
+---
+[]]]></ee:set-variable>
+				<ee:set-variable variableName="failedRecords" ><![CDATA[%dw 2.0
+output application/json
+---
+[]]]></ee:set-variable>
+				<ee:set-variable variableName="jobIds" ><![CDATA[%dw 2.0
+output application/json
+---
+[]]]></ee:set-variable>
+				<ee:set-variable variableName="businessKey" ><![CDATA[%dw 2.0
+output text/plain
+---
+"Contact"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="1c282adb-c9b7-433a-b09f-f42fb927eb96" collection="#[payload]" batchSize="${contact.batchSize}">
+			<ee:transform doc:name="Transform Paylod to CSV" doc:id="af0dd0d6-1f3f-43c0-a394-239c2e100913" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv header=true, separator="|", lineSeparator="\r\n"
+---
+payload]]></ee:set-payload>
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="successRecords" ><![CDATA[%dw 2.0
+output application/json
+---
+[]]]></ee:set-variable>
+					<ee:set-variable variableName="failedRecords" ><![CDATA[%dw 2.0
+output application/json
+---
+[]]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<salesforce:create-job-bulk-api-v2 objectType="Contact" operation="upsert" doc:name="Create job bulk api v2" doc:id="b65c6f1a-187e-4630-9283-7bcb5397dd4b" config-ref="Salesforce_Config" lineEnding="CRLF" externalIdFieldName="Employee_ID__c" columnDelimiter="PIPE"/>
+			<set-variable value="#[output application/json&#10;---&#10;vars.jobIds &lt;&lt; payload.id]" doc:name="Set jobIds" doc:id="4c1b0aa1-af58-4dc5-b803-7b7afe23d3a8" variableName="jobIds" />
+		</foreach>
+		<flow-ref doc:name="Flow Reference to sf-check-job-status" doc:id="ff58ec27-8d24-4304-9c83-fb404500eb09" name="sf-check-job-status"/>
+		<choice doc:name="Check For Failed Records" doc:id="6668c1ff-29b6-4f1c-bd92-f0165fd64ac2" >
+			<when expression="#[sizeOf(vars.failedRecords) &gt; 0]" >
+				<ee:transform doc:name="Setting Payload For Failed Records" doc:id="68254942-64e3-41bf-8535-f6fe9c2a95d0" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+output application/json
+var failedRecords = vars.failedRecords map ((item, index)-> {
+	"Employee_ID__c": item.originalFields.Employee_ID__c default null,
+    "Name": (item.originalFields.FirstName ++ " " ++ item.originalFields.LastName) default null,
+	"Email": item.originalFields.Email default null,
+	"ErrorDescription": (item.errorMessage replace ( "\<br>") with " ") replace ("\\") with ""
+	})
+---
+{
+	"to": p('email.supportTeam.to'),
+	"subject": p('email.contacts.subject') ++ (vars.correlationId),
+	"body": p('email.contacts.body'),
+	"cc": p('email.supportTeam.cc'),
+	"attachments": [{
+		"filename": "FailedContactRecords.csv",
+		"content": toBase64(write(failedRecords,"application/csv",{"separator" : ","})),
+		"contentType": "plain/text"
+	}]
+}
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Flow Reference to send-mail-graph-sys-api" doc:id="e4e7f6ad-0c20-4c24-9f78-d089f6fc04cf" name="send-mail-graph-sys-api" />
+			</when>
+		</choice>
+		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="958d0be8-187b-4779-95dd-528b97b75106" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Sync Contact Flow End&quot;,&#10;	&quot;Total Failed Records&quot;: sizeOf(vars.failedRecords) default 0, &#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]" />
+	</flow>
+</mule>

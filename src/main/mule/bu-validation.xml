@@ -1,0 +1,376 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd"><flow name="workday-bu-sf-sync" doc:id="46ca6711-2441-40c7-826f-532ff636e58d" >
+		<logger level="INFO" doc:name="INFO: Log Info" doc:id="19a6579b-c58b-488a-b391-c69ccd205a50" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Starting BU validation and sync&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]"/>
+		<flow-ref doc:name="Flow Reference to bu-validation-subflow" doc:id="d245bd71-2f0a-4dc6-95b0-6e1aa4eed72a" name="bu-validation-subflow"/>
+		<logger level="DEBUG" doc:name="DEBUG: Log BU SF upsert data" doc:id="20364ee5-16e4-403f-9889-69a6fabfb0a0" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Before upserting BU records to SF&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now(),&#10;   	&quot;Payload&quot;: payload,&#10;   	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" category="bu.validation"/>
+		<flow-ref doc:name="Flow Reference to baird-workday-integration-upsert-bu-accounts-Flow" doc:id="10a43025-64e0-4407-a53b-1ea77a1dbde1" name="baird-workday-integration-upsert-bu-accounts-Flow"/>
+		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="09ae4e73-3fa8-4018-8c6b-679c6e2a9f03" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Syncing BU records completed.&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now()&#10;}]"/>
+	</flow>
+	<flow name="bu-validation-subflow" doc:id="b46cd4de-e4d1-4b8e-a333-1265c3ca5eef" >
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="1e7b375e-8fc9-4617-995e-0a34cd2da308" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Starting BU validation.&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" />
+		<try doc:name="Try" doc:id="6a23d80d-4968-4d3f-b005-7d64fad27af0">
+			<flow-ref doc:name="fetch-business-unit-subflow" doc:id="32449266-434b-4110-b2f1-f9b37e67314b" name="fetch-business-unit-subflow" />
+			<error-handler>
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="54372c15-2858-419e-bba7-6ed3aad99d68">
+					<logger level="ERROR" doc:name="ERROR: Log ERROR" doc:id="d48d23fd-3c30-486f-bc55-2abe5fa99380" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Error encountered while fetching BusinessUnits ,terminating sync&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;Error&quot;: error.description,&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" category="bu.validation" />
+					<ee:transform doc:name="Email payload" doc:id="10411acb-84c4-4d43-ac22-d775fd6818c4">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"to": p('email.supportTeam.to'),
+	"subject": p('email.error.subject') ++ vars.correlationId,
+	"body": p('email.error.body') ++ (error.description default "Something went wrong") ++ "\nCorrelationId: " ++ vars.correlationId ++ "\nTimeStamp: " ++ now() ++"\n\nRegards,\nMulesoft Application\n",
+	"cc": p('email.supportTeam.cc'),
+	"attachments": []
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<flow-ref doc:name="Flow Reference to send-mail-graph-sys-api" doc:id="f1e521b5-75fe-4d26-b5ea-97fe967575fe" name="send-mail-graph-sys-api" />
+							<os:store doc:name="Set Current Sync State" doc:id="d3890d58-b73e-4cf7-86ea-6d0978b57082" key="syncState" objectStore="Object_store_syncStatus">
+								<os:value><![CDATA[#["Stopped"]]]></os:value>
+							</os:store>
+				</on-error-propagate>
+			</error-handler>
+		</try>
+		<ee:transform doc:name="Filter invalid BU records" doc:id="663bcc28-7575-412f-95e6-bd87bf365f28">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload filter ((item) -> (! isEmpty(item.Descriptor.Id) and ! isEmpty(item.Descriptor.Name)) and ((item.Level == 1 and ! isEmpty(item.Descriptor.Id) and ! isEmpty(item.Descriptor.Name)) or (item.Level == 2 and ! isEmpty(item.Level1Descriptor.Id) and ! isEmpty(item.Level1Descriptor.Name)) or (item.Level == 3 and ! isEmpty(item.Level2Descriptor.Id) and ! isEmpty(item.Level2Descriptor.Name)) or (item.Level == 4 and ! isEmpty(item.Level3Descriptor.Id) and ! isEmpty(item.Level3Descriptor.Name)) or (item.Level == 5 and ! isEmpty(item.Level4Descriptor.Id) and ! isEmpty(item.Level4Descriptor.Name)) or (item.Level == 6 and ! isEmpty(item.Level5Descriptor.Id) and ! isEmpty(item.Level5Descriptor.Name))))]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="duplicateBusinessUnits" doc:id="2f194790-de98-44b4-b618-7e694bd77ba6">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="duplicateBusinessUnits"><![CDATA[%dw 2.0
+output application/json
+var grouped = payload groupBy ((item) -> item.Descriptor.Id)
+---
+flatten(
+    grouped filterObject ((val, key) -> sizeOf(val) > 1) pluck ((value, key) -> value[1 to -1])
+)]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="filteredBusinessUnits" doc:id="361b245a-9a74-4206-97a0-899a666729e7">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="filteredBusinessUnits"><![CDATA[%dw 2.0
+output application/json
+---
+payload distinctBy ((item) -> item.Descriptor.Id)]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="check if duplicate notification needs to be sent" doc:id="b11cc9b6-47ee-4e33-8f44-cecf468d7313">
+			<when expression="#[!isEmpty(vars.duplicateBusinessUnits)]">
+				<logger level="DEBUG" doc:name="DEBUG: Log Info" doc:id="4fb41e0d-ce64-43d3-b611-2b9f446e9418" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;message&quot;: &quot;Duplicates exist in Business Units, sending notification email&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;,&#10;	&quot;identifiers&quot;: {&#10;		&quot;data&quot;: vars.duplicateBusinessUnits.Descriptor.Id joinBy  (&quot;,&quot;) default null&#10;	}&#10;}]" category="bu.validation" />
+				<async doc:name="Async" doc:id="42b4df4d-1dcc-4170-9cf0-588d31b98965">
+					<flow-ref doc:name="Send Duplicate BU Nofitication" doc:id="c729bab7-5b67-4696-be7b-76bcf9a90989" name="send-duplicate-BU-enteries-nofitication" />
+				</async>
+			
+</when>
+			<otherwise>
+				<logger level="INFO" doc:name="INFO: Log Info" doc:id="0cf27623-d155-4ab8-bd49-b6a2a6b1b605" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;message&quot;: &quot;No Duplicates exist ,skipping Email notification&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" />
+			</otherwise>
+		</choice>
+		<ee:transform doc:name="Input Payload For SF Upsert" doc:id="3de1a739-5dd4-44a2-8823-8e0d89fff2db">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+//function to remove duplicates by Id
+fun uniqueById(arr) = 
+  arr filter ((item, idx) -> 
+    indexOf((arr map (i) -> i.Id), item.Id) == idx
+  )
+---
+[{
+	"Level1Descriptor": uniqueById(
+      vars.filteredBusinessUnits filter ((item) -> (item.Level1Descriptor != null and item.Level1Descriptor.Id != null) or (item.Level == 1 and !isEmpty(item.Descriptor.Id))) map ((item) -> {
+		Id: if ( isEmpty(item.Level1Descriptor.Id) ) (item.Descriptor.Id)else(item.Level1Descriptor.Id),
+		Name: if ( isEmpty(item.Level1Descriptor.Name) ) (item.Descriptor.Name)else(item.Level1Descriptor.Name),
+		ParentId: null
+	})
+    )
+},
+  {
+	"Level2Descriptor": uniqueById(
+      vars.filteredBusinessUnits filter ((item) -> (item.Level2Descriptor != null and item.Level2Descriptor.Id != null) or (item.Level == 2 and !isEmpty(item.Descriptor.Id))) map ((item) -> {
+		Id: if ( isEmpty(item.Level2Descriptor.Id) ) (item.Descriptor.Id)else(item.Level2Descriptor.Id),
+		Name: if ( isEmpty(item.Level2Descriptor.Name) ) (item.Descriptor.Name)else(item.Level2Descriptor.Name),
+		ParentId: if ( item.Level1Descriptor.Id != null ) item.Level1Descriptor.Id else null // should ideally be not null
+	})
+    )
+},
+  {
+	"Level3Descriptor": uniqueById(
+      vars.filteredBusinessUnits filter ((item) -> (item.Level3Descriptor != null and item.Level3Descriptor.Id != null) or (item.Level == 3 and !isEmpty(item.Descriptor.Id))) map ((item) -> {
+		Id: if ( isEmpty(item.Level3Descriptor.Id) ) (item.Descriptor.Id)else(item.Level3Descriptor.Id),
+		Name: if ( isEmpty(item.Level3Descriptor.Name) ) (item.Descriptor.Name)else(item.Level3Descriptor.Name),
+		ParentId: if ( item.Level2Descriptor != null ) item.Level2Descriptor.Id else null
+	})
+    )
+},
+  {
+	"Level4Descriptor": uniqueById(
+      vars.filteredBusinessUnits filter ((item) -> (item.Level4Descriptor != null and item.Level4Descriptor.Id != null) or (item.Level == 4 and !isEmpty(item.Descriptor.Id))) map ((item) -> {
+		Id: if ( isEmpty(item.Level4Descriptor.Id) ) (item.Descriptor.Id)else(item.Level4Descriptor.Id),
+		Name: if ( isEmpty(item.Level4Descriptor.Name) ) (item.Descriptor.Name)else(item.Level4Descriptor.Name),
+		ParentId: if ( item.Level3Descriptor != null ) item.Level3Descriptor.Id else null
+	})
+    )
+},
+  {
+	"Level5Descriptor": uniqueById(
+      vars.filteredBusinessUnits filter((item) -> (item.Level5Descriptor != null and item.Level5Descriptor.Id != null) or (item.Level == 5 and !isEmpty(item.Descriptor.Id))) map ((item) -> {
+		Id: if ( isEmpty(item.Level5Descriptor.Id) ) (item.Descriptor.Id)else(item.Level5Descriptor.Id),
+		Name: if ( isEmpty(item.Level5Descriptor.Name) ) (item.Descriptor.Name)else(item.Level5Descriptor.Name),
+		ParentId: if ( item.Level4Descriptor != null ) item.Level4Descriptor.Id else null
+	})
+    )
+},
+  {
+	"Level6Descriptor": uniqueById(
+      vars.filteredBusinessUnits filter ((item) -> (item.Level6Descriptor != null and item.Level6Descriptor.Id != null) or (item.Level == 6 and !isEmpty(item.Descriptor.Id))) map ((item) -> {
+		Id: if ( isEmpty(item.Level6Descriptor.Id) ) (item.Descriptor.Id)else(item.Level6Descriptor.Id),
+		Name: if ( isEmpty(item.Level6Descriptor.Name) ) (item.Descriptor.Name)else(item.Level6Descriptor.Name),
+		ParentId: if ( item.Level5Descriptor != null ) item.Level5Descriptor.Id else null
+	})
+    )
+}]
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<flow-ref doc:name="mark-accounts-inactive-subflow" doc:id="8dd384a1-ff0f-4d26-97a6-df12b3b72ad7" name="mark-accounts-inactive-subflow" />
+		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="123373a2-194d-445d-a6a5-0a5bf38c2aa2" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Ending BU validation flow&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now(),&#10;   	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;   	&#10;}]" />
+	</flow>
+	<sub-flow name="mark-accounts-inactive-subflow" doc:id="ba8114bd-4b83-4dcf-ad07-fdca2fdb3c87" >
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="96cb7778-a1b7-46b2-8967-2effd9b5e3d8" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Start updating Inactive BU in Account Object. Total Records: &quot; ++ sizeOf(payload),&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now(),&#10;   	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" />
+		<ee:transform doc:name="Set BU Array and SF query to Fetch data" doc:id="25c06340-6893-4716-a699-adbec3ee7b42" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="sfQuery" ><![CDATA[%dw 2.0
+output application/json
+---
+"Select Id,Baird_BU_ID__c from Account where RecordType.DeveloperName = " ++ "'" ++ p('sfQuery.recordTypeDevName') ++ "'" ]]></ee:set-variable>
+				<ee:set-variable variableName="businessUnitIds" ><![CDATA[[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<try doc:name="Try" doc:id="33702a49-a809-4f70-88bc-16ef571fe1a6">
+				<salesforce:query doc:name="Fetch ALL BU from Salesforce" doc:id="5901a810-7c6a-4189-92cd-c5cb2a40b784" config-ref="Salesforce_Config" target="sfResponse">
+					<salesforce:salesforce-query><![CDATA[#[vars.sfQuery]]]></salesforce:salesforce-query>
+				</salesforce:query>
+				<ee:transform doc:name="Set sfResponse" doc:id="24e2526d-f553-4030-bab1-fe89efd485a4">
+					<ee:message>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="sfResponse"><![CDATA[%dw 2.0
+output application/json
+var invalidIds = (vars.sfResponse.Baird_BU_ID__c) -- (payload..Id)
+---
+vars.sfResponse filter ((item) -> invalidIds contains item.Baird_BU_ID__c)]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<error-handler>
+					<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="e983d8e9-ff9d-47ab-a184-8b7a510320a6">
+						<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="6a5e6e41-fc77-483c-b12f-a85aab6708e3" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Error while fetching BU data from Salesforce, terminating the sync&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now(),&#10;   	&quot;BusinessKey&quot;: &quot;Account&quot;,&#10;   	&quot;Error&quot;: error.description&#10;}]" category="bu.validation"/>
+						<ee:transform doc:name="Email payload" doc:id="e46b69d3-f7cc-480b-9c14-e76dd852a8e4">
+							<ee:message>
+								<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"to": p('email.supportTeam.to'),
+	"subject": p('email.error.subject') ++ vars.correlationId,
+	"body": p('email.error.body') ++ (error.description default "Something went wrong") ++ "\nCorrelationId: " ++ vars.correlationId ++ "\nTimeStamp: " ++ now() ++"\n\nRegards,\nMulesoft Application\n",
+	"cc": p('email.supportTeam.cc'),
+	"attachments": []
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<flow-ref doc:name="Flow Reference to send-mail-graph-sys-api" doc:id="41678a5c-c846-499b-852f-9a380f014d79" name="send-mail-graph-sys-api" />
+						<os:store doc:name="Set Current Sync State" doc:id="a682039e-781c-4096-87f5-f6d520d7d932" key="syncState" objectStore="Object_store_syncStatus">
+							<os:value><![CDATA[#["Stopped"]]]></os:value>
+						</os:store>
+					</on-error-propagate>
+				</error-handler>
+			</try>
+		<ee:transform doc:name="set-extra-businessUnit-active as false" doc:id="373d217f-922c-4e40-86af-1343d94394ed" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="upsertRequest" ><![CDATA[%dw 2.0
+output application/json
+---
+vars.sfResponse map((item,index) ->
+	{
+		"Id": item.Id,
+		"Active__c": false
+	}
+)]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="FOR EACH in upsert array" doc:id="349d8821-3e08-4952-bd75-48abbf6f1bf2" collection="#[vars.upsertRequest]" batchSize="${batch.setInactiveQuery}">
+			<logger level="DEBUG" doc:name="DEBUG: Log Outbound" doc:id="777b55c8-5aa2-4a18-80a9-2f8649cc8f33" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Updating batch of records in SF Account object&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;,	&#10;	&quot;data&quot;: payload default &quot;N/A&quot;,&#10;	&quot;batchSize&quot;: p('batch.setInactiveQuery') default null,&#10;	&quot;batchNum&quot;: vars.counter default null&#10;}]" category="bu.validation"/>
+			<try doc:name="Try" doc:id="3cd8c3a6-19b7-4bf8-b521-17f2163b8b47">
+					<salesforce:update doc:name="Set invalid BU as Inactive " doc:id="863a0f8e-2343-4883-a254-713607cb180a" config-ref="Salesforce_Config" type="Account">
+		</salesforce:update>
+					<error-handler>
+						<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="c9e81055-f267-42fa-bd0c-8400f1b7c5ef">
+							<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="163febf5-e19f-45b4-9c7d-899522064685" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Error while setting invalid BU inactive in SF, terminating the sync&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now(),&#10;   	&quot;BusinessKey&quot;: &quot;Account&quot;,&#10;   	&quot;Error&quot;: error.description default null&#10;}]" category="bu.validation"/>
+							<ee:transform doc:name="Email payload" doc:id="631d4252-3af0-43a6-9f6d-93c53c27406b">
+								<ee:message>
+									<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"to": p('email.supportTeam.to'),
+	"subject": p('email.error.subject') ++ vars.correlationId,
+	"body": p('email.error.body') ++ (error.description default "Something went wrong") ++ "\nCorrelationId: " ++ vars.correlationId ++ "\nTimeStamp: " ++ now() ++"\n\nRegards,\nMulesoft Application\n",
+	"cc": p('email.supportTeam.cc'),
+	"attachments": []
+}]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+							<flow-ref doc:name="Flow Reference to send-mail-graph-sys-api" doc:id="a81dfe62-c07f-486b-ba3c-28d22ace28c6" name="send-mail-graph-sys-api" />
+							<os:store doc:name="Set Current Sync State" doc:id="9d33d90e-0439-4ed5-879d-9f3dc77ef12a" key="syncState" objectStore="Object_store_syncStatus">
+								<os:value><![CDATA[#["Stopped"]]]></os:value>
+							</os:store>
+						</on-error-propagate>
+					</error-handler>
+				</try>
+		</foreach>
+		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="6980cc8c-520c-4d49-a08a-8fc561bdae42" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;End updating Inactive BU in Account Object&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" />
+	
+</sub-flow>
+	<sub-flow name="fetch-business-unit-subflow" doc:id="d7bb9f05-2fc3-40ab-9fee-b0e10aceecaf" >
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="bb7f677a-c7c7-4060-8f59-96df9112b2e2" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Before fetching business units from associate service&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]"/>
+		<until-successful maxRetries="5" doc:name="Until Successful" doc:id="54914620-4183-4957-bf0c-1dcd37ff8188" >
+			<try doc:name="Try" doc:id="44d871fb-1d3e-4c6f-97ce-79028710f11f">
+				<http:request method="${associateService.token.method}" doc:name="Request to fetch Token" doc:id="a068f761-0100-40ec-9b28-b83893c08f1e" config-ref="HTTP_Request_configuration_associate_service" path="${associateService.token.path}" sendCorrelationId="ALWAYS">
+					<http:body ><![CDATA[#[%dw 2.0
+output urlencoded
+---
+{
+	grant_type: "client_credentials",
+	client_id: p('associateService.clientId'),
+	client_secret: p('secure::associateService.clientSecret')
+}]]]></http:body>
+					<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Content-Type" : "application/x-www-form-urlencoded"
+}]]]></http:headers>
+				</http:request>
+				<logger level="INFO" doc:name="INFO: Log Token Reponse" doc:id="1d7329fb-02dc-494f-9b0c-314c2dcd657d" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: if ( !isEmpty(payload) ) &quot;Received Token&quot; else &quot;Token not Received&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" />
+				<error-handler >
+					<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="80a849cf-af11-44b7-bf4b-fff5e2e35872" type="HTTP:BAD_REQUEST, HTTP:METHOD_NOT_ALLOWED, HTTP:NOT_FOUND, HTTP:UNAUTHORIZED" >
+						<logger level="ERROR" doc:name="ERROR: Log ERROR" doc:id="75b55859-4687-4379-ac7b-59a92e54a285" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" category="bu.validation"/>
+						<ee:transform doc:name="dataError" doc:id="696589c0-05a0-4ac9-a7f5-b93fc50eb08f" >
+							<ee:message />
+							<ee:variables >
+								<ee:set-variable variableName="dataError" ><![CDATA[error.description default "Something went wrong"]]></ee:set-variable>
+							</ee:variables>
+						</ee:transform>
+					</on-error-continue>
+					<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="5cf29450-0cf4-4197-947c-5003ab400af2" />
+				</error-handler>
+		</try>
+		</until-successful>
+		<choice doc:name="Check for dataError" doc:id="aca934a1-1a1a-4f9f-886e-81652ef5b30c">
+					<when expression="#[!isEmpty(vars.dataError)]">
+						<raise-error doc:name="Raise error" doc:id="fcf71cd2-d40c-4feb-8637-78e32723dc3b" type="FAILS:DATA_ERROR" description="#[vars.dataError]" />
+					</when>
+				</choice>
+		<ee:transform doc:name="Fetch Access Token" doc:id="339da0bb-fea8-40f0-ba32-fd330fbca67e" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="accessToken" ><![CDATA[payload.access_token]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<until-successful maxRetries="3" doc:name="Until Successful" doc:id="b4296bea-1d02-4eaa-9b57-cb2f7f53d340" >
+			<try doc:name="Try" doc:id="4b695c3f-3ae0-4dc7-b835-221a8a6d2d81" >
+				<http:request method="${associateService.bu.method}" doc:name="fetch-businessUnits" doc:id="64fbb16d-3e30-4765-908f-c5d4d43a80a0" config-ref="HTTP_Request_configuration_associate_service" path="${associateService.bu.path}" sendCorrelationId="ALWAYS">
+					<http:headers ><![CDATA[#[output application/java
+---
+{
+	"source" : "realtime",
+	"Authorization" : "Bearer " ++ vars.accessToken,
+	"Accept" : "application/json"
+}]]]></http:headers>
+				</http:request>
+				<logger level="INFO" doc:name="INFO: Log Count of BusinessUnits" doc:id="82b4223c-d19e-4bb6-ac14-a46785f12741" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Total Count of Business Units: &quot;++ sizeOf(payload),&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" />
+				<error-handler >
+					<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="1bbee837-03d7-4931-bd7b-0a477b2f931c" type="HTTP:BAD_REQUEST, HTTP:METHOD_NOT_ALLOWED, HTTP:NOT_FOUND, HTTP:UNAUTHORIZED">
+						<logger level="ERROR" doc:name="ERROR: Log ERROR" doc:id="29e86550-0ac2-4b87-8bd5-ec7d57578a07" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" category="bu.validation"/>
+						<ee:transform doc:name="dataError" doc:id="a237826e-eeee-476b-8776-4364cafefe63" >
+							<ee:message >
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable variableName="dataError" ><![CDATA[error.description default "Something went wrong"]]></ee:set-variable>
+							</ee:variables>
+						</ee:transform>
+					</on-error-continue>
+					<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="0da717a2-b4aa-4263-8636-5a7a0494c4df" />
+				</error-handler>
+			</try>
+		</until-successful>
+		<choice doc:name="Check for dataError" doc:id="2485cb2b-7228-4799-9672-2d5b9717ce2d">
+			<when expression="#[!isEmpty(vars.dataError)]">
+				<raise-error doc:name="Raise error" doc:id="1154f673-8cb5-4816-b787-aca2db5b4a7b" type="FAILS:DATA_ERROR" description="#[vars.dataError]" />
+			</when>
+		</choice>
+		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="b29f33a9-4b57-4f79-9f8b-048b084877ca" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;After fetching business units from associate service&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]"/>
+	
+</sub-flow>
+	<sub-flow name="send-duplicate-BU-enteries-nofitication" doc:id="20d7d91b-7b52-4815-98b1-2cf660cd6fd0" >
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="1d39a12b-62dd-4774-b448-91d16b7116ba" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Before sending Email with Duplicate BU&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now(),&#10;   	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" />
+		<ee:transform doc:name="Email payload" doc:id="f900499c-aa45-423a-8f08-a6dedea625d2" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+output application/json
+var emailContent = vars.duplicateBusinessUnits map((item,index)
+-> {
+	"S No": index +1 default "",
+	"BusinessUnitCode": item.Descriptor.Id default "",
+	"Name": item.Descriptor.Name default "",
+	"Level": item.Level default ""
+})
+---
+{
+	"to": p('email.businessUsers.to'),
+	"cc": p('email.businessUsers.cc'),
+	"subject": p('email.buDuplicates.subject') ++ vars.correlationId,
+	"body": p('email.buDuplicates.body'),
+	"attachments": [{
+		"filename": "BusinessUnitDuplicates_Report.csv",
+		"content": toBase64(write(emailContent,"application/csv",{
+			header: true
+		})),
+		"contentType": "plain/text"
+	}]
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="DEBUG : Log Duplicate Email Content" doc:id="7e1b28b2-e411-402d-8b7b-87bd541b233e" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Before sending email for BU duplicates&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;,&#10;	&quot;Payload&quot;: payload&#10;}]" category="bu.validation"/>
+		<flow-ref doc:name="Flow Reference to send-mail-graph-sys-api" doc:id="cfc848ae-fbea-4e7a-b891-0c30b7a8b8bf" name="send-mail-graph-sys-api" />
+		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="0fc2e94e-8642-4a2f-965b-fed62f050b7a" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;After sending Email with Duplicate BU&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]"/>
+	</sub-flow>
+	
+	
+</mule>
