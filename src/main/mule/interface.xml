@@ -25,8 +25,8 @@ http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/cu
 					<os:value ><![CDATA[#["Running"]]]></os:value>
 				</os:store>
 				<flow-ref doc:name="flow-reference to workday-bu-sf-sync" doc:id="1f7e95d6-58cd-47cb-a343-7716e2a5eba6" name="workday-bu-sf-sync" />
-				<flow-ref doc:name="flow-reference to workday-workers-sf-sync" doc:id="e2b71afe-2249-4672-9fb5-af672d86e775" name="workday-workers-sf-sync" />
 				<flow-ref doc:name="flow-reference to workday-contacts-sf-sync" doc:id="1130ea65-9d66-44c5-9540-4e04ff6270e9" name="workday-contacts-sf-sync" />
+				<flow-ref doc:name="flow-reference to workday-workers-sf-sync" doc:id="e2b71afe-2249-4672-9fb5-af672d86e775" name="workday-workers-sf-sync" />
 				<os:store doc:name="Set Current Sync State" doc:id="b69d821f-4657-4081-bee0-a0cc56acef51" key="syncState" objectStore="Object_store_syncStatus">
 			<os:value><![CDATA[#["Stopped"]]]></os:value>
 		</os:store>

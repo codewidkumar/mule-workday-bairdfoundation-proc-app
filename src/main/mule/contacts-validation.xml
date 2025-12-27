@@ -11,6 +11,7 @@ http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mu
 http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
 	<flow name="workday-contacts-sf-sync" doc:id="eeea5578-4802-4080-b3f7-f60dc74752bb" >
 		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="b7e30a08-1470-4237-9f90-ceb815a07c0c" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Before starting validation and contact sync subflow&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now(),&#10;   	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]"/>
+		<flow-ref doc:name="Flow Reference" doc:id="3c3d080f-cc52-447c-9a05-92f5c013c9c0" name="invokeWorkdayImpl" />
 		<flow-ref doc:name="Flow Reference to baird-workday-contact-sync-subflow" doc:id="21c07776-a3b4-4843-a92f-b23c98171ea4" name="baird-workday-contact-sync-subflow"/>
 		<logger level="DEBUG" doc:name="DEBUG: Log Contact details" doc:id="aae3d158-06b7-46df-90b5-284dac8d0afb" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Before syncing contact details&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;,&#10;   	&quot;Payload&quot;: payload&#10;}]" category="contacts.sync"/>
 		<flow-ref doc:name="Flow Reference to sync-contacts-to-sf-subflow" doc:id="70526ab5-9a19-40f9-9ba8-b720772c5a2a" name="sync-contacts-to-sf-subflow"/>
@@ -141,7 +142,7 @@ fun getPhone(data) = do{
 	"AccountId": accountMappedIds[item.BusinessUnitOrganization.Descriptor.Id][0] default null,
 	"Termination_Date__c": item.EmploymentDetail.TerminationDate default "#N/A"
 }
-)) filter $.User__c != null]]></ee:set-payload>
+)) //filter $.User__c != null]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="22d37d9d-2bf1-4b41-b16a-e46d5e20e307" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Ending contact validation flow&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]"/>

@@ -8,14 +8,13 @@ http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/
 http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
 http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
 http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
-	<flow name="workday-workers-sf-sync" doc:id="48042fda-6821-4f0f-8425-fca10c33e150">
-		<logger level="INFO" doc:name="INFO: Log Start" doc:id="2dd50e1c-a2d8-4bc2-a4c1-7ec753c5f3d5" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Sync Workers Flow Started&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]"/>
-		<try doc:name="Try" doc:id="6cd3fca5-ef51-4765-adc7-62ffc3436179">
-				<until-successful maxRetries="${worker.untilSuccessful.maxRetries}" doc:name="Until Successful" doc:id="7a983140-3fea-443e-b16a-b4852513a915" millisBetweenRetries="${worker.untilSuccessful.interval}">
-				<try doc:name="Try" doc:id="eb4911cb-039b-4260-b5b0-09d9ab341bb8" >
-					<logger level="INFO" doc:name="INFO: Log Info" doc:id="8c381248-a43b-4b0c-925a-b1fcd079276d" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch Token for Associate Services&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
-					<http:request method="${associateService.token.method}" doc:name="Request to fetch Token" doc:id="a7a408eb-d569-4d56-9872-26e8c9173895" config-ref="HTTP_Request_configuration_associate_service" path="${associateService.token.path}">
-					<http:body><![CDATA[#[%dw 2.0
+	<sub-flow name="invokeWorkdayImpl" doc:id="7f2d2c8f-828b-4d89-9bbc-33ad5dbdac6e" >
+		<try doc:name="Try" doc:id="2925a8ac-134e-4986-a56d-3d8d467ef65e" >
+			<until-successful maxRetries="${worker.untilSuccessful.maxRetries}" doc:name="Until Successful" doc:id="49d48ce8-5f33-453e-81fd-63975a77515b" millisBetweenRetries="${worker.untilSuccessful.interval}" >
+				<try doc:name="Try" doc:id="2654dc82-3c2d-4b2c-bd3b-3b04a27e5f64" >
+					<logger level="INFO" doc:name="INFO: Log Info" doc:id="7be8f558-9d01-4c2b-bc23-5eca42e31f75" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch Token for Associate Services&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+					<http:request method="${associateService.token.method}" doc:name="Request to fetch Token" doc:id="d82b81d3-1715-4a18-bbca-e1ecb5d6459e" config-ref="HTTP_Request_configuration_associate_service" path="${associateService.token.path}" >
+						<http:body ><![CDATA[#[%dw 2.0
 output urlencoded
 ---
 {
@@ -23,28 +22,27 @@ output urlencoded
 	client_id: p('associateService.clientId'),
 	client_secret: p('secure::associateService.clientSecret')
 }]]]></http:body>
-					<http:headers><![CDATA[#[output application/java
+						<http:headers ><![CDATA[#[output application/java
 ---
 {
 	"Content-Type" : "application/x-www-form-urlencoded"
 }]]]></http:headers>
-				</http:request>
-					<logger level="INFO" doc:name="INFO: Log Info" doc:id="a1688203-3ab8-4712-86cf-45ff77a2bd1f" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch Workers Data from Associate Services&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
-					<http:request method="${associateService.workers.method}" doc:name="Request to /workers" doc:id="007b71ae-c0c3-4083-81b3-5be04939e0ac" config-ref="HTTP_Request_configuration_associate_service" path="${associateService.workers.path}">
-					<http:headers><![CDATA[#[output application/java
+					</http:request>
+					<logger level="INFO" doc:name="INFO: Log Info1" doc:id="a0394a5b-b1bb-41c1-b2db-8f1bec93f72e" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch Workers Data from Associate Services&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+					<http:request method="${associateService.workers.method}" doc:name="Request to /workers" doc:id="02bc430d-a127-4654-9fb3-c91c34140508" config-ref="HTTP_Request_configuration_associate_service" path="${associateService.workers.path}" >
+						<http:headers ><![CDATA[#[output application/java
 ---
 {
 	"Authorization" : "Bearer " ++ payload.access_token,
 	"Accept": "application/json"
 }]]]></http:headers>
-				</http:request>
-					<logger level="INFO" doc:name="INFO: Log Info" doc:id="75d40244-6f1e-434c-b43f-ad703718f0e1" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Succesfully fetched Associate Services Workers Data. Count : &quot; ++ (sizeOf(payload) default 0),&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+					</http:request>
+					<logger level="INFO" doc:name="INFO: Log Info2" doc:id="06fa9ecc-24a7-4b65-a054-3c82cbc288fc" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Succesfully fetched Associate Services Workers Data. Count : &quot; ++ (sizeOf(payload) default 0),&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
 					<error-handler >
-						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue for Connectivity  Failures" doc:id="5612cda0-0ecc-4561-8e5f-601b1c53ab54" when='#[error.errorType.identifier != "CONNECTIVITY"]'>
-							<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="60a934f9-ec2a-4f7c-993d-a9d0408f5bd3" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]"/>
-							<ee:transform doc:name="Set errorObject" doc:id="9c9d6e3c-99b7-4ac7-8a40-811e935aba5b" >
-								<ee:message >
-								</ee:message>
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue for Connectivity  Failures" doc:id="f0a46ce0-a5d4-48b2-b522-9ff436ada66b" when='#[error.errorType.identifier != "CONNECTIVITY"]' >
+							<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="94b47ee1-d2fd-443b-8c9c-ba56115cbb32" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+							<ee:transform doc:name="Set errorObject" doc:id="1279dd21-9ffd-451a-8fc3-49c2eddcf36e" >
+								<ee:message />
 								<ee:variables >
 									<ee:set-variable variableName="errorObject" ><![CDATA[%dw 2.0
 output application/java
@@ -55,26 +53,26 @@ error]]></ee:set-variable>
 						</on-error-continue>
 					</error-handler>
 				</try>
-		</until-successful>
-			<validation:is-true doc:id="64f0af88-3c04-4384-8776-9d9fa48f47ee" message="#[vars.errorObject.detailedDescription]" expression="#[vars.errorObject == null]"/>
-			<error-handler>
-					<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate for other erros" doc:id="e108f25a-0364-40b2-90a7-1710dba6e1a0" type="ANY">
-						<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="42c34a7b-f6a4-47e7-91d9-a36e2e5840c0" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: vars.errorObject.detailedDescription,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
-					</on-error-propagate>
-				</error-handler>
+			</until-successful>
+			<validation:is-true doc:name="Is true" doc:id="36571ebf-1690-4e63-846c-aaad0a0acfcc" expression="#[vars.errorObject == null]" message="#[vars.errorObject.detailedDescription]" />
+			<error-handler >
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate for other erros" doc:id="b6b36d8e-6271-4eff-b35e-d7a1465896e9" type="ANY" >
+					<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="1a321cd6-31e2-459f-aa18-58579a6f431e" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: vars.errorObject.detailedDescription,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+				</on-error-propagate>
+			</error-handler>
 		</try>
-		<logger level="INFO" doc:name="INFO: Log Info" doc:id="8661c4ba-9f3c-408a-bbdd-0b634fc5fd8a" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SF Users Data&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
-		<salesforce:query doc:name="Query All User EmployeesData" doc:id="62b48c97-9d24-4707-9f4b-534b93d23eb2" config-ref="Salesforce_Config" target="userEmployeeNumbers" targetValue='#[output application/json&#10;---&#10;payload]'>
+		<logger level="INFO" doc:name="INFO: Log Info" doc:id="e29b77e6-ba71-44b9-935d-0662cd763df7" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SF Users Data&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+		<salesforce:query doc:name="Query All User EmployeesData" doc:id="e03eb8ef-efec-44d6-b077-9dbdb7c711fd" config-ref="Salesforce_Config" target="userEmployeeNumbers" targetValue="#[output application/json&#10;---&#10;payload]" >
 			<ee:repeatable-file-store-iterable inMemoryObjects="5000" />
-			<salesforce:salesforce-query><![CDATA[Select Id, EmployeeNumber,ProfileId,UserRoleId,IsActive from User]]></salesforce:salesforce-query>
+			<salesforce:salesforce-query ><![CDATA[Select Id, EmployeeNumber,ProfileId,UserRoleId,IsActive from User]]></salesforce:salesforce-query>
 		</salesforce:query>
-		<flow-ref doc:name="Flow Reference to workers-validation-flow" doc:id="657bb791-9484-4dff-ac47-72dbdde88ed1" name="workers-validation-subflow"/>
-		<async doc:name="Async" doc:id="958b076f-1baa-4092-8e36-a389bed5132a" >
-			<choice doc:name="Check For Invalid Workers" doc:id="91f314df-4c44-4c2a-9edb-febbad8a057b">
-			<when expression="#[sizeOf(vars.invalidWorkers) &gt; 0]">
-				<ee:transform doc:name="Set InvalidWorkers EmailPayload" doc:id="b9ec693b-954f-4b71-a515-706c61dd6c58">
-				<ee:message>
-					<ee:set-payload><![CDATA[%dw 2.0
+		<flow-ref doc:name="Flow Reference to workers-validation-flow" doc:id="cb8e8b2a-fd5a-42f9-9471-ff449d64708c" name="workers-validation-subflow" />
+		<async doc:name="Async" doc:id="eabd99ba-eedc-4c52-aa9a-a7d2d95e4bc7" >
+			<choice doc:name="Check For Invalid Workers" doc:id="dbea52f8-050c-441e-8a22-17725ad2eab9" >
+				<when expression="#[sizeOf(vars.invalidWorkers) &gt; 0]" >
+					<ee:transform doc:name="Set InvalidWorkers EmailPayload" doc:id="97bfaa53-915b-4866-9800-251c3d633830" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
 import * from dw::core::Binaries
 output application/json
 var invalidWorkers = (vars.invalidWorkers filter($.EmploymentDetail.HireDate <= (now() as Date))) map ((item, index)-> {
@@ -97,12 +95,109 @@ var invalidWorkers = (vars.invalidWorkers filter($.EmploymentDetail.HireDate <= 
  }]
 }
  ]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<flow-ref doc:name="Flow Reference to mail-invalid-workers" doc:id="aa747629-fc81-459f-8c10-32322cf13ac4" name="send-mail-graph-sys-api" />
+				</when>
+			</choice>
+		</async>
+	</sub-flow>
+	<flow name="workday-workers-sf-sync" doc:id="48042fda-6821-4f0f-8425-fca10c33e150">
+		<logger level="INFO" doc:name="INFO: Log Start" doc:id="2dd50e1c-a2d8-4bc2-a4c1-7ec753c5f3d5" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Sync Workers Flow Started&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]"/>
+		<flow-ref doc:name="Flow Reference" doc:id="084dc4e2-07ac-4588-9965-d5231f1c35be" name="invokeWorkdayImpl"/>
+		<!-- [STUDIO:"Try"]<try doc:name="Try" doc:id="6cd3fca5-ef51-4765-adc7-62ffc3436179">
+				<until-successful maxRetries="${worker.untilSuccessful.maxRetries}" doc:name="Until Successful" doc:id="7a983140-3fea-443e-b16a-b4852513a915" millisBetweenRetries="${worker.untilSuccessful.interval}">
+				<try doc:name="Try" doc:id="eb4911cb-039b-4260-b5b0-09d9ab341bb8" >
+					<logger level="INFO" doc:name="INFO: Log Info" doc:id="8c381248-a43b-4b0c-925a-b1fcd079276d" message="#[%dw 2.0&#10;output application/json&#10;&#45;&#45;-&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch Token for Associate Services&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}&#93;" />
+					<http:request method="${associateService.token.method}" doc:name="Request to fetch Token" doc:id="a7a408eb-d569-4d56-9872-26e8c9173895" config-ref="HTTP_Request_configuration_associate_service" path="${associateService.token.path}">
+					<http:body><![CDATA[#[%dw 2.0
+output urlencoded
+&#45;&#45;-
+{
+	grant_type: "client_credentials",
+	client_id: p('associateService.clientId'),
+	client_secret: p('secure::associateService.clientSecret')
+}&#93;&#93;&#93;></http:body>
+					<http:headers><![CDATA[#[output application/java
+&#45;&#45;-
+{
+	"Content-Type" : "application/x-www-form-urlencoded"
+}&#93;&#93;&#93;></http:headers>
+				</http:request>
+					<logger level="INFO" doc:name="INFO: Log Info" doc:id="a1688203-3ab8-4712-86cf-45ff77a2bd1f" message="#[%dw 2.0&#10;output application/json&#10;&#45;&#45;-&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch Workers Data from Associate Services&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}&#93;" />
+					<http:request method="${associateService.workers.method}" doc:name="Request to /workers" doc:id="007b71ae-c0c3-4083-81b3-5be04939e0ac" config-ref="HTTP_Request_configuration_associate_service" path="${associateService.workers.path}">
+					<http:headers><![CDATA[#[output application/java
+&#45;&#45;-
+{
+	"Authorization" : "Bearer " ++ payload.access_token,
+	"Accept": "application/json"
+}&#93;&#93;&#93;></http:headers>
+				</http:request>
+					<logger level="INFO" doc:name="INFO: Log Info" doc:id="75d40244-6f1e-434c-b43f-ad703718f0e1" message="#[%dw 2.0&#10;output application/json&#10;&#45;&#45;-&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Succesfully fetched Associate Services Workers Data. Count : &quot; ++ (sizeOf(payload) default 0),&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}&#93;" />
+					<error-handler >
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue for Connectivity  Failures" doc:id="5612cda0-0ecc-4561-8e5f-601b1c53ab54" when='#[error.errorType.identifier != "CONNECTIVITY"&#93;'>
+							<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="60a934f9-ec2a-4f7c-993d-a9d0408f5bd3" message="#[%dw 2.0&#10;output application/json&#10;&#45;&#45;-&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}&#93;"/>
+							<ee:transform doc:name="Set errorObject" doc:id="9c9d6e3c-99b7-4ac7-8a40-811e935aba5b" >
+								<ee:message >
+								</ee:message>
+								<ee:variables >
+									<ee:set-variable variableName="errorObject" ><![CDATA[%dw 2.0
+output application/java
+&#45;&#45;-
+error&#93;&#93;></ee:set-variable>
+								</ee:variables>
+							</ee:transform>
+						</on-error-continue>
+					</error-handler>
+				</try>
+		</until-successful>
+			<validation:is-true doc:id="64f0af88-3c04-4384-8776-9d9fa48f47ee" message="#[vars.errorObject.detailedDescription&#93;" expression="#[vars.errorObject == null&#93;"/>
+			<error-handler>
+					<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate for other erros" doc:id="e108f25a-0364-40b2-90a7-1710dba6e1a0" type="ANY">
+						<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="42c34a7b-f6a4-47e7-91d9-a36e2e5840c0" message="#[%dw 2.0&#10;output application/json&#10;&#45;&#45;-&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: vars.errorObject.detailedDescription,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}&#93;" />
+					</on-error-propagate>
+				</error-handler>
+		</try> [STUDIO] -->
+		<!-- [STUDIO:"INFO: Log Info"]<logger level="INFO" doc:name="INFO: Log Info" doc:id="8661c4ba-9f3c-408a-bbdd-0b634fc5fd8a" message="#[%dw 2.0&#10;output application/json&#10;&#45;&#45;-&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SF Users Data&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}&#93;" /> [STUDIO] -->
+		<!-- [STUDIO:"Query All User EmployeesData"]<salesforce:query doc:name="Query All User EmployeesData" doc:id="62b48c97-9d24-4707-9f4b-534b93d23eb2" config-ref="Salesforce_Config" target="userEmployeeNumbers" targetValue='#[output application/json&#10;&#45;&#45;-&#10;payload&#93;'>
+			<ee:repeatable-file-store-iterable inMemoryObjects="5000" />
+			<salesforce:salesforce-query><![CDATA[Select Id, EmployeeNumber,ProfileId,UserRoleId,IsActive from User&#93;&#93;></salesforce:salesforce-query>
+		</salesforce:query> [STUDIO] -->
+		<!-- [STUDIO:"Flow Reference to workers-validation-flow"]<flow-ref doc:name="Flow Reference to workers-validation-flow" doc:id="657bb791-9484-4dff-ac47-72dbdde88ed1" name="workers-validation-subflow"/> [STUDIO] -->
+		<!-- [STUDIO:"Async"]<async doc:name="Async" doc:id="958b076f-1baa-4092-8e36-a389bed5132a" >
+			<choice doc:name="Check For Invalid Workers" doc:id="91f314df-4c44-4c2a-9edb-febbad8a057b">
+			<when expression="#[sizeOf(vars.invalidWorkers) &gt; 0&#93;">
+				<ee:transform doc:name="Set InvalidWorkers EmailPayload" doc:id="b9ec693b-954f-4b71-a515-706c61dd6c58">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+output application/json
+var invalidWorkers = (vars.invalidWorkers filter($.EmploymentDetail.HireDate <= (now() as Date))) map ((item, index)-> {
+ "UserName": item.UserName default null,
+ "FirstName": item.FirstName default null,
+ "LastName": item.LastName default null,
+ "EmployeeId": item.EmpId default null,
+ "Email": item.Emails[0&#93;.EmailAddress default null
+})
+&#45;&#45;-
+{
+ "to": p('email.businessUsers.to'),
+ "subject": p('email.invalidUsers.subject') ++ vars.correlationId,
+ "body": p('email.invalidUsers.body'),
+ "cc": p('email.businessUsers.cc'),
+ "attachments": [{
+  "filename": "InvalidUsers.csv",
+  "content": toBase64(write(invalidWorkers,"application/csv")),
+  "contentType": "plain/text"
+ }&#93;
+}
+ &#93;&#93;></ee:set-payload>
 				</ee:message>
 			</ee:transform>
 				<flow-ref doc:name="Flow Reference to mail-invalid-workers" doc:id="17e47776-ed8b-44c1-a365-70b5932f0aaf" name="send-mail-graph-sys-api" />
 			</when>
 		</choice>
-		</async>
+		</async> [STUDIO] -->
 		<ee:transform doc:name="Set Payload For Updating isActive" doc:id="1e522295-6d46-44c3-b995-06eafe04c75f" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
