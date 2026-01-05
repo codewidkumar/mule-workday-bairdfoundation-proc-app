@@ -407,6 +407,7 @@ vars.validWorkers map((item, index) ->
 ) ++ 
 //CommonFields
 	{
+		
 		"FirstName": item.FirstName,
 		"LastName": item.LastName,
 		"EmailEncodingKey": "ISO-8859-1",
@@ -501,6 +502,10 @@ fun getPhone(data) = do{
 	"UserRoleId": null,
 	"Id": null
 }]]></ee:set-variable>
+				<ee:set-variable variableName="workerspayload" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
 			</ee:variables>
 		</ee:transform>
 		<logger level="INFO" doc:name="INFO: Log End" doc:id="b8ec84b1-d259-486c-90d3-2432766e1fde" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Payload Set Successfully for the Workers Sync&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
@@ -509,6 +514,22 @@ fun getPhone(data) = do{
 			<remove-variable doc:name="Remove Used Variables" doc:id="5ea7ca13-0288-4cee-a8ee-e493baea4eee" variableName="#[payload]"/>
 		</foreach>
 		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="e3fc040f-e6ef-432a-8156-da218e154e1c" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Sync Workers Flow End&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+		<flow-ref doc:name="Flow Reference to contact-update-subflow" doc:id="2d4954b9-e404-451f-b199-2bbad050fdb3" name="contact-update-subflow"/>
+		<ee:transform doc:name="Transform Message" doc:id="f74b59d0-51c7-4cb0-a3a5-6b9caebd7f96" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+((vars.Finalcontactdetails.records) map (c) -> {
+  Contact_External_Id__c : c.Id,
+  User_External_Id__c:
+    (vars.Finaluserdetails.records filter ($.ContactId == c.Id))[0].Id
+})]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="83e5f677-d099-4f71-8636-3f115728d29e" >
+			<salesforce:upsert doc:name="Upsert" doc:id="da6f6ea4-bac2-4ee8-a6e0-3ac2aa9c94fa" config-ref="Salesforce_Config" externalIdFieldName="Contact_External_Id__c" objectType="Contact"/>
+		</foreach>
 		<error-handler >
 			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="2926eb27-cc52-4e27-950f-a808efebdd1d" >
 				<logger level="ERROR" doc:name="log-error" doc:id="5879161c-7a60-4b24-9ef2-3642162b8785" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"APIName": "baird-wday-sfdc-sync-app",&#10;	"FlowName": flow.name,&#10;	"Error": error.description default "Internal Server Error",&#10;	"CorrelationId": vars.correlationId,&#10;	"TimeStamp": now(),&#10;	"BusinessKey": "Worker"&#10;}]'/>
@@ -554,6 +575,8 @@ var partitioned = payload partition ((item) ->
 	validWorkersData: partitioned[1]
 }]]></ee:set-payload>
 			</ee:message>
+			<ee:variables >
+			</ee:variables>
 		</ee:transform>
 		<ee:transform doc:name="Initializing Variables" doc:id="91d6661d-c6d2-42d7-8fd6-4f0fd779332e">
 			<ee:message>
@@ -567,6 +590,16 @@ payload.validWorkersData]]></ee:set-variable>
 output application/json
 ---
 payload.invalidWorkersData]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="contactsdata variable" doc:id="b4d7f8d7-7f6a-456f-b10a-c16c68b3e291" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contactsdata" ><![CDATA[%dw 2.0
+output application/json
+---
+flatten((vars.invalidWorkers default []) + (vars.validWorkers default []))]]></ee:set-variable>
 			</ee:variables>
 		</ee:transform>
 	</sub-flow>
