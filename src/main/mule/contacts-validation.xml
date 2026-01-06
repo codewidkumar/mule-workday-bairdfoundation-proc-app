@@ -43,6 +43,63 @@ var errorDescription = if(vars.errorObject == null) (error.description default "
 			</on-error-propagate>
 		</error-handler>
 	</flow>
+	<sub-flow name="contacts-validation-final-subflow" doc:id="2d3df3db-4ec2-4e73-86c5-f221742e98a4" >
+	<ee:transform doc:name="Transform Message" doc:id="25eeddda-1bf4-4922-9da3-6ea86cb206e3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"update":"SELECT Id, Username,Employee_ID__c,EmployeeNumber FROM Contacts where Employee_ID__c
+ == null"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:query doc:name="Query" doc:id="7cb587a2-e498-4ce5-a77a-4dd739c39601" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query ><![CDATA[#[payload]]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="10c50695-7b1a-4444-b5ea-a9232724904d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"('" ++ (payload.records.Id default [] joinBy "','") ++ "')"]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Finalcontactupsertdata" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="8592e63e-d058-46e2-a070-355cf2ba3185" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"update":"select Id,Employee_ID__c,Name,ContactId,EmployeeNumber from User where ContactId IN " ++ (payload default "")
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:query doc:name="Query" doc:id="645d023e-922e-4c1a-8139-b69f0d924682" config-ref="Salesforce_Config" target="Finalcontactupsert">
+			<salesforce:salesforce-query ><![CDATA[#[payload]]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="2e49789d-fd86-4aa6-9138-bbe326072aa2" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.Finalcontactupsert map ((item,index)->{
+	"Id":item.Id,
+	"User_External_Id__c ":(vars.Finalcontactupsertdata default [])[?($.EmployeeNumber == item.EmployeeNumber)].Employee_ID__c
+})]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="9762456f-aeb9-4e85-9e9a-53a0eac68b07" >
+			<salesforce:update doc:name="Update" doc:id="3ce3c7d0-0424-46ff-b8fc-02815de98b7d" config-ref="Salesforce_Config" type="Contact"/>
+		</foreach>
+	</sub-flow>
 	<sub-flow name="baird-workday-contact-sync-subflow" doc:id="ac15351e-633c-42fd-9c7c-8e3ac5f2d6ee" >
 		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="e87be435-3883-40a3-978e-60f8164c4bfb" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Before starting contact validation subflow&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]"/>
 		<ee:transform doc:name="SF Queries And Variables" doc:id="8f107cbc-4bc7-4361-a84c-ef3d72058278" >
@@ -189,38 +246,7 @@ vars.empsContactDetails ++ ((payload filter ((item, index) -> item.EmployeeNumbe
 			</ee:transform>
 		</foreach>
 	</sub-flow>
-	<sub-flow name="contact-update-subflow" doc:id="516b13de-728e-455c-8ceb-0c1663eda30d" >
-		<ee:transform doc:name="Transform Message" doc:id="944bac69-5c65-447e-9312-174bb9a15895">
-			<ee:message>
-			</ee:message>
-			<ee:variables >
-				<ee:set-variable variableName="contactexternalIdquery" ><![CDATA[%dw 2.0
-output application/json
----
-{
-	"update":"select id,User__r.EmployeeNumber,user__r.Name,user__c from contact limit 50"
-}]]></ee:set-variable>
-			</ee:variables>
-		</ee:transform>
-		<salesforce:query doc:name="Query" doc:id="d29ea7c1-46d9-465c-8994-e9f9772dc2c0" config-ref="Salesforce_Config" target="Finalcontactdetails">
-			<salesforce:salesforce-query ><![CDATA[#[vars.contactexternalIdquery.update]]]></salesforce:salesforce-query>
-		</salesforce:query>
-		<ee:transform doc:name="Transform Message" doc:id="e4687a8a-55b6-4300-86cd-7d4b7784c231" >
-			<ee:message >
-			</ee:message>
-			<ee:variables >
-				<ee:set-variable variableName="userexternaIdupdate" ><![CDATA[%dw 2.0
-output application/json
----
-{
-	"update":"SELECT Id,Contact_Id__c,ContactId,Username FROM User limit 50"
-}]]></ee:set-variable>
-			</ee:variables>
-		</ee:transform>
-		<salesforce:query doc:name="Query" doc:id="8b792d6e-e9b2-4aab-9b5a-5131f8113205" config-ref="Salesforce_Config" target="Finaluserdetails">
-			<salesforce:salesforce-query ><![CDATA[#[vars.userexternaIdupdate.update]]]></salesforce:salesforce-query>
-		</salesforce:query>
-	</sub-flow>
+
 	<sub-flow name="baird-sf-id-mapping-subflow" doc:id="21b75c90-c77b-4470-a397-6bd11b8e0ab4" >
 		<foreach doc:name="FOR EACH in bairdIds" doc:id="089e8405-b4e7-44b4-86bc-d647b5a86430" collection="#[vars.bairdIds]" batchSize="${batch.empContacts}" >
 			<ee:transform doc:name="Select Query Account" doc:id="004a8541-447a-43c5-8444-38e3bc041d27" >
