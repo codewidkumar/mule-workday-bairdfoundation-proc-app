@@ -11,7 +11,7 @@ http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mu
 	</sub-flow>
 	<sub-flow name="workers-sync-subflow" doc:id="10cc51db-5935-41c8-903b-0ce4c35f6199" >
 		<salesforce:query doc:name="Query User" doc:id="6bae857c-a386-4fc9-a640-056d3876947d" config-ref="Salesforce_Config">
-			<salesforce:salesforce-query ><![CDATA[SELECT Id FROM User where ContactId == null]]></salesforce:salesforce-query>
+			<salesforce:salesforce-query ><![CDATA[SELECT Id FROM User where ContactId = null]]></salesforce:salesforce-query>
 		</salesforce:query>
 		<ee:transform doc:name="extract sf-userId" doc:id="863b6d7f-7ad5-4ded-b36a-1984a2686d6e" >
 			<ee:message >
@@ -56,7 +56,7 @@ payload.records map ((item,value)->{
 	</sub-flow>
 	<sub-flow name="contacts-validation-final-subflow" doc:id="0f43d91b-0d78-44ab-9bef-edc438e285bb" >
 		<salesforce:query doc:name="Query Contacts" doc:id="dd0275d0-f30a-40d9-a3a2-caf138f26fd9" config-ref="Salesforce_Config" >
-			<salesforce:salesforce-query ><![CDATA[SELECT Id FROM Contacts where User__c == null]]></salesforce:salesforce-query>
+			<salesforce:salesforce-query ><![CDATA[SELECT Id FROM Contact where User__c = null]]></salesforce:salesforce-query>
 		</salesforce:query>
 		<ee:transform doc:name="Transform Message1" doc:id="e5697939-06e9-4136-a140-952561349734" >
 			<ee:message >
