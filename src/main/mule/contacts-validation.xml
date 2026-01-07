@@ -283,40 +283,6 @@ error]]></ee:set-variable>
 			<salesforce:salesforce-query ><![CDATA[Select Id, EmployeeNumber,ProfileId,UserRoleId,IsActive from User]]></salesforce:salesforce-query>
 		</salesforce:query>
 		<flow-ref doc:name="Flow Reference to workers-validation-flow" doc:id="c662e1e1-db40-4a44-b8f6-a295191efaf6" name="workers-validation-subflow" />
-		<async doc:name="Async" doc:id="61d4262d-fbf4-4478-8110-1df4f6fea0d8" >
-			<choice doc:name="Check For Invalid Workers" doc:id="1bf03620-3bd0-4d91-8bc7-341d81657d91" >
-				<when expression="#[sizeOf(vars.invalidWorkers) &gt; 0]" >
-					<ee:transform doc:name="Set InvalidWorkers EmailPayload" doc:id="abd50f49-9fb9-4032-82ff-d9901ebc55d2" >
-						<ee:message >
-							<ee:set-payload ><![CDATA[%dw 2.0
-import * from dw::core::Binaries
-output application/json
-var invalidWorkers = (vars.invalidWorkers filter($.EmploymentDetail.HireDate <= (now() as Date))) map ((item, index)-> {
- "UserName": item.UserName default null,
- "FirstName": item.FirstName default null,
- "LastName": item.LastName default null,
- "EmployeeId": item.EmpId default null,
- "Email": item.Emails[0].EmailAddress default null
-})
----
-{
- "to": p('email.businessUsers.to'),
- "subject": p('email.invalidUsers.subject') ++ vars.correlationId,
- "body": p('email.invalidUsers.body'),
- "cc": p('email.businessUsers.cc'),
- "attachments": [{
-  "filename": "InvalidUsers.csv",
-  "content": toBase64(write(invalidWorkers,"application/csv")),
-  "contentType": "plain/text"
- }]
-}
- ]]></ee:set-payload>
-						</ee:message>
-					</ee:transform>
-					<flow-ref doc:name="Flow Reference to mail-invalid-workers" doc:id="98d19d9b-9cc3-4605-8471-8868b39f7e8c" name="send-mail-graph-sys-api" />
-				</when>
-			</choice>
-		</async>
 	</sub-flow>
 	<sub-flow name="workers-validation-subflow" doc:id="4060620b-8513-4024-bc28-fa7eff3d20e6" >
 		<ee:transform doc:name="Partition Valid and Invalid Workers" doc:id="3a0547de-4dcf-4b93-998e-6ab10604cafc" >

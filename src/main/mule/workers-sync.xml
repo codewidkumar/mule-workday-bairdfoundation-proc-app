@@ -17,7 +17,40 @@ http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/cu
 http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
 	<flow name="workday-workers-sf-sync" doc:id="48042fda-6821-4f0f-8425-fca10c33e150">
 		<logger level="INFO" doc:name="INFO: Log Start" doc:id="2dd50e1c-a2d8-4bc2-a4c1-7ec753c5f3d5" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Sync Workers Flow Started&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]"/>
-		<flow-ref doc:name="Flow Reference" doc:id="084dc4e2-07ac-4588-9965-d5231f1c35be" name="invokeWorkdayImpl" />
+		<async doc:name="Async" doc:id="0958f076-b3a4-4860-b099-ee2f0cee04db">
+			<choice doc:name="Check For Invalid Workers" doc:id="95b20a6f-95fb-4217-a150-0b57586f8070">
+				<when expression="#[sizeOf(vars.invalidWorkers) &gt; 0]">
+					<ee:transform doc:name="Set InvalidWorkers EmailPayload" doc:id="e9bcb4ff-657a-4183-8908-931e6b3714b9">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+output application/json
+var invalidWorkers = (vars.invalidWorkers filter($.EmploymentDetail.HireDate <= (now() as Date))) map ((item, index)-> {
+ "UserName": item.UserName default null,
+ "FirstName": item.FirstName default null,
+ "LastName": item.LastName default null,
+ "EmployeeId": item.EmpId default null,
+ "Email": item.Emails[0].EmailAddress default null
+})
+---
+{
+ "to": p('email.businessUsers.to'),
+ "subject": p('email.invalidUsers.subject') ++ vars.correlationId,
+ "body": p('email.invalidUsers.body'),
+ "cc": p('email.businessUsers.cc'),
+ "attachments": [{
+  "filename": "InvalidUsers.csv",
+  "content": toBase64(write(invalidWorkers,"application/csv")),
+  "contentType": "plain/text"
+ }]
+}
+ ]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<flow-ref doc:name="Flow Reference to mail-invalid-workers" doc:id="fec1f65a-e40f-4c5a-a7dd-f5535bcad55b" name="send-mail-graph-sys-api" />
+				</when>
+			</choice>
+		</async>
 		<ee:transform doc:name="Set Payload For Updating isActive" doc:id="2248fa06-34e7-4f67-a3f7-0b9b85339333">
 			<ee:message>
 				<ee:set-payload><![CDATA[%dw 2.0
