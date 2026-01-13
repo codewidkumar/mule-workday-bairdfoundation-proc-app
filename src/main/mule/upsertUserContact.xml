@@ -19,7 +19,7 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
 	</sub-flow>
 	<sub-flow name="workers-sync-subflow" doc:id="10cc51db-5935-41c8-903b-0ce4c35f6199" >
 		<salesforce:query doc:name="Query User" doc:id="6bae857c-a386-4fc9-a640-056d3876947d" config-ref="Salesforce_Config">
-			<salesforce:salesforce-query ><![CDATA[SELECT Id FROM User where ContactId = null]]></salesforce:salesforce-query>
+			<salesforce:salesforce-query ><![CDATA[SELECT Id FROM User where ContactId = null and IsActive = true]]></salesforce:salesforce-query>
 		</salesforce:query>
 		<ee:transform doc:name="Extract SF-UserId" doc:id="863b6d7f-7ad5-4ded-b36a-1984a2686d6e" >
 			<ee:message >
