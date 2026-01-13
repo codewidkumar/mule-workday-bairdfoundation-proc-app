@@ -59,12 +59,12 @@ output application/json
 				<ee:set-variable variableName="empIds" ><![CDATA[%dw 2.0
 output application/json
 ---
-(vars.contactsdata.EmpId ++ vars.contactsdata.JobPositionDetail.SupervisorEmpId distinctBy $) filter $ != null]]></ee:set-variable>
+(vars.validWorkers.EmpId ++ vars.validWorkers.JobPositionDetail.SupervisorEmpId distinctBy $) filter $ != null]]></ee:set-variable>
 				<ee:set-variable variableName="empsContactDetails" ><![CDATA[[]]]></ee:set-variable>
 				<ee:set-variable variableName="bairdIds" ><![CDATA[%dw 2.0
 output application/json
 ---
-(vars.contactsdata.BusinessUnitOrganization.Descriptor.Id distinctBy $) filter $ != null]]></ee:set-variable>
+(vars.validWorkers.BusinessUnitOrganization.Descriptor.Id distinctBy $) filter $ != null]]></ee:set-variable>
 				<ee:set-variable variableName="empsAccountsDetails" ><![CDATA[[]]]></ee:set-variable>
 			
 </ee:variables>
@@ -100,7 +100,7 @@ fun getPhone(data) = do{
     else "#N/A"
 }
 ---
-(vars.contactsdata default [] map ((item, index) ->
+(vars.validWorkers default [] map ((item, index) ->
 {
 	"FirstName": item.FirstName  default null,
 	"LastName": item.LastName  default null,
@@ -323,15 +323,15 @@ output application/json
 payload.invalidWorkersData]]></ee:set-variable>
 			</ee:variables>
 		</ee:transform>
-		<ee:transform doc:name="contactsdata variable" doc:id="ed4611be-ec89-4043-982f-3150313095be" >
+		<!-- [STUDIO:"contactsdata variable"]<ee:transform doc:name="contactsdata variable" doc:id="ed4611be-ec89-4043-982f-3150313095be" >
 			<ee:message />
 			<ee:variables >
 				<ee:set-variable variableName="contactsdata" ><![CDATA[%dw 2.0
 output application/json
----
-flatten((vars.invalidWorkers default []) + (vars.validWorkers default []))]]></ee:set-variable>
+&#45;&#45;-
+flatten((vars.invalidWorkers default [&#93;) + (vars.validWorkers default [&#93;))&#93;&#93;></ee:set-variable>
 			</ee:variables>
-		</ee:transform>
+		</ee:transform> [STUDIO] -->
 	</sub-flow>
 	
 	

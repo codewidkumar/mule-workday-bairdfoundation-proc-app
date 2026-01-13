@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
-	xmlns="http://www.mulesoft.org/schema/mule/core"
-	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
-http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="47603b0b-2b8b-4ca6-b385-a32181496cb8" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="upsertUserContactFlow" doc:id="97652c4f-a71a-446a-b3a5-9f6f03cceaba" >
+		<http:listener doc:name="Listener" doc:id="05aaac40-c23d-418c-a77e-46c506aecdd4" path="/workday" config-ref="HTTP_Listener_config"/>
+		<flow-ref doc:name="Flow Reference" doc:id="245ed863-4ccf-493a-856a-a9be3c14365f" name="upsert-user-contact-subflow"/>
+	</flow>
 	<sub-flow name="upsert-user-contact-subflow" doc:id="2c176368-7485-4180-9f1a-ef4cd906a655" >
 		<flow-ref doc:name="Flow Reference to workers-sync-sub-flow" doc:id="e7f7f43e-0dbc-4871-b9d9-88d9f7011f9d" name="workers-sync-subflow" />
 		<flow-ref doc:name="Flow Reference to contacts-validation-final-subflow" doc:id="f5127487-e072-41ac-a8de-9755a12f9b44" name="contacts-validation-final-subflow" />
@@ -18,7 +26,7 @@ http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mu
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/dw
 ---
-"('" ++ (payload.records.Id default [] joinBy "','") ++ "')"
+"('" ++ (payload.Id default [] joinBy "','") ++ "')"
 ]]></ee:set-payload>
 			</ee:message>
 			<ee:variables >
@@ -36,7 +44,7 @@ output application/json
 			<ee:variables >
 			</ee:variables>
 		</ee:transform>
-		<salesforce:query doc:name="Query Contact" doc:id="c46dff3d-c5db-4c9d-930e-c30f0c572390" config-ref="Salesforce_Config" target="Finalcontactdetails" >
+		<salesforce:query doc:name="Query Contact" doc:id="c46dff3d-c5db-4c9d-930e-c30f0c572390" config-ref="Salesforce_Config">
 			<salesforce:salesforce-query ><![CDATA[#[payload.update]]]></salesforce:salesforce-query>
 		</salesforce:query>
 		<ee:transform doc:name="Set Mapping for User Update" doc:id="0df2c720-06f6-4288-a1cc-554fc75f78ff" >
@@ -44,13 +52,13 @@ output application/json
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/json
 ---
-payload.records map ((item,value)->{
+payload map ((item,value)->{
 	"ContactId":item.Id,
 	"Id": item.User__c
 })]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
-		<foreach doc:name="For Each" doc:id="fbf05581-50ea-4035-a712-f69357c05910" collection="#[payload]">
+		<foreach doc:name="For Each" doc:id="fbf05581-50ea-4035-a712-f69357c05910" collection="#[payload]" batchSize="2">
 			<salesforce:update type="User" doc:name="Update User" doc:id="a3641db2-c2cb-4a00-a6ba-3e7f087b577b" config-ref="Salesforce_Config" />
 		</foreach>
 	</sub-flow>
@@ -63,7 +71,7 @@ payload.records map ((item,value)->{
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/json
 ---
-"('" ++ (payload.records.Id default [] joinBy "','") ++ "')"]]></ee:set-payload>
+"('" ++ (payload.Id default [] joinBy "','") ++ "')"]]></ee:set-payload>
 			</ee:message>
 			<ee:variables >
 			</ee:variables>
@@ -78,7 +86,7 @@ output application/json
 }]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
-		<salesforce:query doc:name="Query User" doc:id="7cb19b27-d2ef-4b6e-8112-5792070eb066" config-ref="Salesforce_Config" target="Finalcontactupsert" >
+		<salesforce:query doc:name="Query User" doc:id="7cb19b27-d2ef-4b6e-8112-5792070eb066" config-ref="Salesforce_Config">
 			<salesforce:salesforce-query ><![CDATA[#[payload.update]]]></salesforce:salesforce-query>
 		</salesforce:query>
 		<ee:transform doc:name="Set Mapping for Contact Update" doc:id="c78bfb60-96c2-455a-a67d-66e90c7ded8f" >
@@ -86,13 +94,13 @@ output application/json
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/json
 ---
-payload.records map ((item,index)->{
+payload map ((item,index)->{
 	"Id": item.ContactId,
 	"User__c": item.Id
 })]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
-		<foreach doc:name="For Each" doc:id="ef024bdf-5767-4873-b348-c2f3c5882163" collection="#[payload]">
+		<foreach doc:name="For Each" doc:id="ef024bdf-5767-4873-b348-c2f3c5882163" collection="#[payload]" batchSize="2">
 			<salesforce:update type="Contact" doc:name="Update Contact" doc:id="31294b85-a872-4c1e-a02a-54dbe989a8ca" config-ref="Salesforce_Config" />
 		</foreach>
 	</sub-flow>
