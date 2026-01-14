@@ -298,8 +298,8 @@ var partitioned = payload partition ((item) ->
 		(item.EmpId == null or isEmpty(item.EmpId)) or
 		((isEmpty(item.EmploymentDetail.HireDate)) or item.EmploymentDetail.HireDate > (now() as Date)) 
 		
-		//or 
-		//(item.EmploymentDetail.Active == false and !(vars.userEmployeeNumbers.EmployeeNumber contains item.EmpId))
+		or 
+		(item.EmploymentDetail.Active == false and !(vars.userEmployeeNumbers.EmployeeNumber contains item.EmpId))
 		)
 )
 ---
@@ -323,15 +323,6 @@ output application/json
 payload.invalidWorkersData]]></ee:set-variable>
 			</ee:variables>
 		</ee:transform>
-		<!-- [STUDIO:"contactsdata variable"]<ee:transform doc:name="contactsdata variable" doc:id="ed4611be-ec89-4043-982f-3150313095be" >
-			<ee:message />
-			<ee:variables >
-				<ee:set-variable variableName="contactsdata" ><![CDATA[%dw 2.0
-output application/json
-&#45;&#45;-
-flatten((vars.invalidWorkers default [&#93;) + (vars.validWorkers default [&#93;))&#93;&#93;></ee:set-variable>
-			</ee:variables>
-		</ee:transform> [STUDIO] -->
 	</sub-flow>
 	
 	
