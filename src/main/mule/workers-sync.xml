@@ -124,7 +124,7 @@ fun getUserRoleId(item) = if ( !(vars.userEmployeeNumbers.EmployeeNumber contain
 fun calculateUserRoleId(item) = if ( vars.salesforceBFSystemAdministrator contains item.EmpId ) (vars.userRoleIds filter($.Name == p('sfUserRole.systemAdministrator'))).Id[0]
 	 else if ( vars.salesforceBFStandardUserAdministrator contains item.EmpId ) (vars.userRoleIds filter($.Name == p('sfUserRole.foundationStaff'))).Id[0]	 
 	 else if ( vars.licenseType[item.EmpId][0] == "Community" ) (vars.userRoleIds filter($.Name == p('sfUserRole.associate'))).Id[0]
-	 else if ( vars.licenseType[item.EmpId][0] == "Chatter" and (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).UserRoleId[0] == null ) null
+	 else if ( vars.licenseType[item.EmpId][0] == "EligibileForMatch" and (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).UserRoleId[0] == null ) null
 	 else do{
 	var logWarning = log("WARNING", "Not Eligible for license, Full Name: " ++ item.FirstName default "" ++ " " ++ item.LastName default "")
 	---
@@ -202,7 +202,7 @@ vars.validWorkers map((item, index) ->
 		"Integration_Level_3_Name__c": item.BusinessUnitOrganization.Level3Descriptor.Name default "#N/A",
 		"Id": (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).Id[0],
 		"ContactId": "",
-		"Eligible_for_Match__c": if (!(vars.salesforceBFSystemAdministrator contains item.EmpId) and !(vars.salesforceBFStandardUserAdministrator contains item.EmpId) and ( vars.licenseType[item.EmpId][0] == "Community" ) ) "True"
+		"Eligible_for_Match__c": if ((!(vars.salesforceBFSystemAdministrator contains item.EmpId) or !(vars.salesforceBFStandardUserAdministrator contains item.EmpId)) and ( vars.licenseType[item.EmpId][0] == "EligibileForMatch" ) ) "True"
 						 else "False"
 	}
 )]]></ee:set-payload>
@@ -271,7 +271,10 @@ fun getPhone(data) = do{
 	"Integration_Level_2_Name__c": item.BusinessUnitOrganization.Level2Descriptor.Name default "#N/A",
 	"Integration_Level_3_Name__c": item.BusinessUnitOrganization.Level3Descriptor.Name default "#N/A",
 	"UserRoleId": null,
-	"Id": null
+	"Id": null,
+	"ContactId": "",
+	"Eligible_for_Match__c": if ((!(vars.salesforceBFSystemAdministrator contains item.EmpId) or !(vars.salesforceBFStandardUserAdministrator contains item.EmpId)) and ( vars.licenseType[item.EmpId][0] == "EligibileForMatch" ) ) "True"
+						 else "False"
 }]]></ee:set-variable>
 				<ee:set-variable variableName="workerspayload" ><![CDATA[%dw 2.0
 output application/json
