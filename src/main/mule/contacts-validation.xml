@@ -283,6 +283,89 @@ error]]></ee:set-variable>
 			<salesforce:salesforce-query ><![CDATA[Select Id, EmployeeNumber,ProfileId,UserRoleId,IsActive from User]]></salesforce:salesforce-query>
 		</salesforce:query>
 		<flow-ref doc:name="Flow Reference to workers-validation-flow" doc:id="c662e1e1-db40-4a44-b8f6-a295191efaf6" name="workers-validation-subflow" />
+		<try doc:name="Try" doc:id="c699ac8a-f2cd-429b-8f3b-2c8be33074ef" >
+			<until-successful maxRetries="${worker.untilSuccessful.maxRetries}" doc:name="Until Successful" doc:id="8a28a151-8e97-407d-8831-82d874f0cd9d" millisBetweenRetries="${worker.untilSuccessful.interval}" >
+				<try doc:name="Try" doc:id="40e5ede8-e88f-45e3-ac89-e304a92813dc" >
+					<logger level="INFO" doc:name="INFO: Log Info" doc:id="9a79a361-a016-475f-807e-a7dadada25e0" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SalesforceBFSystemAdministrator AD Group&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+					<http:request method="${graphAPI.members.method}" doc:name="Request to fetch SalesforceBFSystemAdministrator AD Group" doc:id="737b07ba-b930-4302-8ee4-301f5cc3cd13" config-ref="HTTP_Request_configuration_Graph_Sys_Api" path="${graphAPI.members.path}" target="salesforceBFSystemAdministrator" targetValue="#[payload.response.employeeId]" >
+						<http:headers ><![CDATA[#[output application/java
+---
+{
+	"x-transactionId" : correlationId,
+	"client_secret": p('secure::graphAPI.clientSecret'),
+	"client_id": p('graphAPI.clientId'),
+	"source": "WorkdaySalesforceSyncApplication",
+	"x-msg-timestamp": (now() >> "America/Chicago") as String
+}]]]></http:headers>
+						<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"groupId" : p('groupId.adminUser')
+}]]]></http:uri-params>
+					</http:request>
+					<logger level="INFO" doc:name="INFO: Log Info1" doc:id="2b0ee085-4510-45b1-957d-b46394d0f515" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SalesforceBFStandardUserAdministrator AD Group&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+					<http:request method="${graphAPI.members.method}" doc:name="Request to fetch SalesforceBFStandardUserAdministrator AD Group" doc:id="99e95427-ab47-4950-97b6-e2f299622f85" config-ref="HTTP_Request_configuration_Graph_Sys_Api" path="${graphAPI.members.path}" target="salesforceBFStandardUserAdministrator" targetValue="#[payload.response.employeeId]" >
+						<http:headers ><![CDATA[#[output application/java
+---
+{
+	"x-transactionId" : correlationId,
+	"client_secret": p('secure::graphAPI.clientSecret'),
+	"client_id": p('graphAPI.clientId'),
+	"source": "WorkdaySalesforceSyncApplication",
+	"x-msg-timestamp": (now() >> "America/Chicago") as String
+}]]]></http:headers>
+						<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"groupId" : p('groupId.standardUser')
+}]]]></http:uri-params>
+					</http:request>
+					<error-handler >
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue for Connectivity  Failures" doc:id="a5e7e905-b8d4-48ab-a0d4-58508c138a52" when='#[error.errorType.identifier != "CONNECTIVITY"]' >
+							<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="d19799a4-6971-4b76-b6a5-1be70de05105" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+							<ee:transform doc:name="Set errorObject" doc:id="2e55d88e-d64e-4139-9599-fe6436e76fba" >
+								<ee:message >
+									<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+}]]></ee:set-payload>
+								</ee:message>
+								<ee:variables >
+									<ee:set-variable variableName="errorObject" ><![CDATA[%dw 2.0
+output application/java
+---
+error]]></ee:set-variable>
+								</ee:variables>
+							</ee:transform>
+						</on-error-continue>
+					</error-handler>
+				</try>
+			</until-successful>
+			<validation:is-true doc:name="Is true" doc:id="af365acb-1ed1-4a92-8cc4-b42b23f4bf27" expression="#[vars.errorObject == null]" message="#[vars.errorObject.detailedDescription]" />
+			<error-handler >
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate for other erros" doc:id="508aa89a-32ca-486b-8374-1bfdf55ba460" type="ANY" >
+					<logger level="ERROR" doc:name="log-error" doc:id="fc9f7e0e-7e6f-49fa-941a-fc039f8e4ee6" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: vars.errorObject.detailedDescription,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+				</on-error-propagate>
+			</error-handler>
+		</try>
+		<ee:transform doc:name="Calculate License" doc:id="157649aa-b05f-4060-80d1-d2cca5e9829f" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="licenseType" ><![CDATA[%dw 2.0
+output application/json
+fun licenseType(item) = if ( (item.EmployeeIndicator == "Y") and
+	(((item.Location.CountryCode == "USA") and (item.EmploymentDetail.EmployeeTypeCode == "R")) or 
+	((["GBR","DEU"] contains item.Location.CountryCode) and (["R", "T", "L", "I"] contains item.EmploymentDetail.EmployeeTypeCode))) ) "Community"
+	else if ( !(vars.salesforceBFSystemAdministrator contains item.EmpId) and !(vars.salesforceBFStandardUserAdministrator contains item.EmpId) ) "EligibileForMatch"
+	else null
+---
+vars.validWorkers map((item, index)-> {
+	(item.EmpId) : licenseType(item)
+})
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
 	</sub-flow>
 	<sub-flow name="workers-validation-subflow" doc:id="4060620b-8513-4024-bc28-fa7eff3d20e6" >
 		<ee:transform doc:name="Partition Valid and Invalid Workers" doc:id="3a0547de-4dcf-4b93-998e-6ab10604cafc" >

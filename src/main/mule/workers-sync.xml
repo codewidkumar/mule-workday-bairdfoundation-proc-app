@@ -68,72 +68,6 @@ var empIds = vars.validWorkers.EmpId
 			<logger level="INFO" doc:name="INFO: Log Info" doc:id="8d329f3f-a16a-4764-9933-f78fd64bf263" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Setting Employees IsActive = false, Counter: &quot; ++ vars.counter,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
 			<salesforce:update doc:name="Update IsActive to false" doc:id="c9c1dc84-81de-41b4-8112-a30a94153454" config-ref="Salesforce_Config" type="User" />
 		</foreach>
-		<try doc:name="Try" doc:id="90e585ea-1d80-4268-94c0-9d6e4d3cbbb6">
-			<until-successful maxRetries="${worker.untilSuccessful.maxRetries}" doc:name="Until Successful" doc:id="81409cf2-42af-4d09-bf5b-35bd3d327957" millisBetweenRetries="${worker.untilSuccessful.interval}">
-				<try doc:name="Try" doc:id="c6ac0768-6616-41a7-9007-de0810d44ea2">
-					<logger level="INFO" doc:name="INFO: Log Info" doc:id="c58ffdc0-af88-4397-be7f-dbf2857f9bce" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SalesforceBFSystemAdministrator AD Group&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
-					<http:request method="${graphAPI.members.method}" doc:name="Request to fetch SalesforceBFSystemAdministrator AD Group" doc:id="78582c0a-0a64-4150-ab25-aad0c6b913a6" config-ref="HTTP_Request_configuration_Graph_Sys_Api" path="${graphAPI.members.path}" target="salesforceBFSystemAdministrator" targetValue="#[payload.response.employeeId]" >
-						<http:headers ><![CDATA[#[output application/java
----
-{
-	"x-transactionId" : correlationId,
-	"client_secret": p('secure::graphAPI.clientSecret'),
-	"client_id": p('graphAPI.clientId'),
-	"source": "WorkdaySalesforceSyncApplication",
-	"x-msg-timestamp": (now() >> "America/Chicago") as String
-}]]]></http:headers>
-						<http:uri-params ><![CDATA[#[output application/java
----
-{
-	"groupId" : p('groupId.adminUser')
-}]]]></http:uri-params>
-					</http:request>
-					<logger level="INFO" doc:name="INFO: Log Info" doc:id="3f92c6d2-6f5f-4030-a1df-6b07d54c389f" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SalesforceBFStandardUserAdministrator AD Group&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
-					<http:request method="${graphAPI.members.method}" doc:name="Request to fetch SalesforceBFStandardUserAdministrator AD Group" doc:id="140a6de0-a7b3-44f9-b7a5-66b3e976a803" config-ref="HTTP_Request_configuration_Graph_Sys_Api" path="${graphAPI.members.path}" target="salesforceBFStandardUserAdministrator" targetValue="#[payload.response.employeeId]" >
-						<http:headers ><![CDATA[#[output application/java
----
-{
-	"x-transactionId" : correlationId,
-	"client_secret": p('secure::graphAPI.clientSecret'),
-	"client_id": p('graphAPI.clientId'),
-	"source": "WorkdaySalesforceSyncApplication",
-	"x-msg-timestamp": (now() >> "America/Chicago") as String
-}]]]></http:headers>
-						<http:uri-params ><![CDATA[#[output application/java
----
-{
-	"groupId" : p('groupId.standardUser')
-}]]]></http:uri-params>
-					</http:request>
-					<error-handler>
-						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue for Connectivity  Failures" doc:id="ce4dcf2a-60f8-4b5c-b99a-f8c1838c78cd" when='#[error.errorType.identifier != "CONNECTIVITY"]'>
-							<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="56e0e725-9b29-4bf8-b255-cf697d29e990" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
-							<ee:transform doc:name="Set errorObject" doc:id="00f80b05-8590-4b44-80eb-b863ffe2a3bd">
-								<ee:message >
-									<ee:set-payload ><![CDATA[%dw 2.0
-output application/java
----
-{
-}]]></ee:set-payload>
-								</ee:message>
-								<ee:variables>
-									<ee:set-variable variableName="errorObject"><![CDATA[%dw 2.0
-output application/java
----
-error]]></ee:set-variable>
-								</ee:variables>
-							</ee:transform>
-						</on-error-continue>
-					</error-handler>
-				</try>
-			</until-successful>
-			<validation:is-true doc:name="Is true" doc:id="81a95aab-f205-4c43-b48e-68a317e02ed8" message="#[vars.errorObject.detailedDescription]" expression="#[vars.errorObject == null]"/>
-			<error-handler>
-				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate for other erros" doc:id="671a41a9-2eb0-4a58-adfd-c3f09e74d9be" type="ANY">
-					<logger level="ERROR" doc:name="log-error" doc:id="916b4444-5258-4e8e-9c9f-1d9204f90924" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: vars.errorObject.detailedDescription,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
-				</on-error-propagate>
-			</error-handler>
-		</try>
 		<logger level="INFO" doc:name="INFO: Log Info" doc:id="a07828db-67a5-4331-81cd-3dd987151362" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SF Profile Ids&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
 		<salesforce:query doc:name="Query Profile Ids" doc:id="b54f3295-d82d-4117-af8d-298c337029d8" config-ref="Salesforce_Config" target="profileIds" targetValue="#[output application/json&#10;---&#10;payload]">
 			<salesforce:salesforce-query ><![CDATA[Select Name, Id from Profile where Name IN (':bairdFoundationStandardUser', ':bairdSystemAdministrator', ':bairdAssociate')]]></salesforce:salesforce-query>
@@ -166,24 +100,6 @@ error]]></ee:set-variable>
 }]]]></salesforce:parameters>
 		</salesforce:query>
 		<logger level="INFO" doc:name="INFO: Log Info" doc:id="47d91202-7ac9-442d-82b8-f0c7ef85fdfe" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Setting Payload for the Workers Sync&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
-		<ee:transform doc:name="Calculate License" doc:id="92460d60-94fa-4421-91a9-5149490a993e" >
-			<ee:message >
-			</ee:message>
-			<ee:variables >
-				<ee:set-variable variableName="licenseType" ><![CDATA[%dw 2.0
-output application/json
-fun licenseType(item) = if ( (item.EmployeeIndicator == "Y") and
-	(((item.Location.CountryCode == "USA") and (item.EmploymentDetail.EmployeeTypeCode == "R")) or 
-	((["GBR","DEU"] contains item.Location.CountryCode) and (["R", "T", "L", "I"] contains item.EmploymentDetail.EmployeeTypeCode))) ) "Community"
-	else if ( !(vars.salesforceBFSystemAdministrator contains item.EmpId) and !(vars.salesforceBFStandardUserAdministrator contains item.EmpId) ) "EligibileForMatch"
-	else null
----
-vars.validWorkers map((item, index)-> {
-	(item.EmpId) : licenseType(item)
-})
-]]></ee:set-variable>
-			</ee:variables>
-		</ee:transform>
 		<ee:transform doc:name="Set Payload for Bulk Upsert" doc:id="45c470e7-1f5f-4207-add9-e12a5eff4808" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
