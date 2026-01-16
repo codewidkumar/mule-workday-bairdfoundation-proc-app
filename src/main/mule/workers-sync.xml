@@ -107,7 +107,7 @@ output application/json
 var systemAdminProfileId = (vars.profileIds filter($.Name == p('sfProfileName.bairdSystemAdministrator'))).Id[0]
 var standardUserProfileId = (vars.profileIds filter($.Name == p('sfProfileName.bairdFoundationStandardUser'))).Id[0]
 var associateProfileId = (vars.profileIds filter($.Name == p('sfProfileName.bairdAssociate'))).Id[0]
-var chatterProfileId = (vars.profileIds filter($.Name == p('sfProfileName.chatterFreeUser'))).Id[0]
+//var chatterProfileId = (vars.profileIds filter($.Name == p('sfProfileName.chatterFreeUser'))).Id[0]
 fun getPhone(data) = do{
     var AreaCode = data.AreaCode
     var ContactNumber = data.ContactNumber
@@ -132,7 +132,7 @@ fun calculateUserRoleId(item) = if ( vars.salesforceBFSystemAdministrator contai
 }
 ---
 vars.validWorkers map((item, index) -> 
-	(if ( (vars.userEmployeeNumbers.EmployeeNumber contains item.EmpId) and (((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).ProfileId[0]) != chatterProfileId) and  !(vars.salesforceBFSystemAdministrator contains item.EmpId) and !(vars.salesforceBFStandardUserAdministrator contains item.EmpId) and (vars.licenseType[item.EmpId][0] == "Chatter") ) {
+	(if ( (vars.userEmployeeNumbers.EmployeeNumber contains item.EmpId) and !(vars.salesforceBFSystemAdministrator contains item.EmpId) and !(vars.salesforceBFStandardUserAdministrator contains item.EmpId) and (vars.licenseType[item.EmpId][0] == "EligibileForMatch") ) {
 	// LICENSE_DOWNGRADE_CASE
 		"Email": if ( p('api.env') == "PROD" ) (lower((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0])) else (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) ++ ".invalid")),
 		"FederationIdentifier": "#N/A",
@@ -161,7 +161,7 @@ vars.validWorkers map((item, index) ->
 			"ProfileId": if ( vars.salesforceBFSystemAdministrator contains item.EmpId ) systemAdminProfileId
 						 else if ( vars.salesforceBFStandardUserAdministrator contains item.EmpId ) standardUserProfileId
 						 else if ( vars.licenseType[item.EmpId][0] == "Community" ) associateProfileId
-						 else chatterProfileId,
+						 else null,
 			"CommunityNickname": item.UserName,
 			"IsActive": item.EmploymentDetail.Active,
 			"UserRoleId":
@@ -218,7 +218,7 @@ var downgradeEmpIds = (payload filter($.Alias  startsWith("X"))).Alias map($[1 t
 var systemAdminProfileId = (vars.profileIds filter($.Name == p('sfProfileName.bairdSystemAdministrator'))).Id[0]
 var standardUserProfileId = (vars.profileIds filter($.Name == p('sfProfileName.bairdFoundationStandardUser'))).Id[0]
 var associateProfileId = (vars.profileIds filter($.Name == p('sfProfileName.bairdAssociate'))).Id[0]
-var chatterProfileId = (vars.profileIds filter($.Name == p('sfProfileName.chatterFreeUser'))).Id[0]
+//var chatterProfileId = (vars.profileIds filter($.Name == p('sfProfileName.chatterFreeUser'))).Id[0]
 fun getPhone(data) = do{
     var AreaCode = data.AreaCode
     var ContactNumber = data.ContactNumber
