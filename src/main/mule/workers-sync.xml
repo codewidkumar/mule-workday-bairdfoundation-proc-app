@@ -201,7 +201,9 @@ vars.validWorkers map((item, index) ->
 		"Integration_Level_2_Name__c": item.BusinessUnitOrganization.Level2Descriptor.Name default "#N/A",
 		"Integration_Level_3_Name__c": item.BusinessUnitOrganization.Level3Descriptor.Name default "#N/A",
 		"Id": (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).Id[0],
-		"ContactId": ""
+		"ContactId": "",
+		"Eligible_for_Match__c": if (!(vars.salesforceBFSystemAdministrator contains item.EmpId) and !(vars.salesforceBFStandardUserAdministrator contains item.EmpId) and ( vars.licenseType[item.EmpId][0] == "Community" ) ) "True"
+						 else "False"
 	}
 )]]></ee:set-payload>
 			</ee:message>
