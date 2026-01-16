@@ -65,8 +65,8 @@ officerType:
 sfProfileName:
   bairdSystemAdministrator: "Baird System Administrator"
   bairdFoundationStandardUser: "Baird Foundation Standard User"
-  bairdAssociate: "Baird Associate"
-  chatterFreeUser: "Chatter Free User"
+  bairdAssociate: "Default Minimum Customer Community Plus Login" #"Baird Associate"
+  #chatterFreeUser: "Chatter Free User"
  
 #Salesforce User Roles 
 sfUserRole:

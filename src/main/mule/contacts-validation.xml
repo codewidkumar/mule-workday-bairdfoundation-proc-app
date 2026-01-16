@@ -137,7 +137,7 @@ fun getPhone(data) = do{
 		---
 		if ( (userData != null) and
         (userData.IsActive == "true") and
-        (vars.licenseType[item.EmpId][0] != "Chatter") ) (userData.Id) else null
+        (vars.licenseType[item.EmpId][0] != "Community") ) (userData.Id) else null
 	},
 	"Hire_Date__c": item.EmploymentDetail.HireDate default "#N/A",
 	"AccountId": accountMappedIds[item.BusinessUnitOrganization.Descriptor.Id][0] default null,

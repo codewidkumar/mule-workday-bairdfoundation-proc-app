@@ -136,11 +136,10 @@ error]]></ee:set-variable>
 		</try>
 		<logger level="INFO" doc:name="INFO: Log Info" doc:id="a07828db-67a5-4331-81cd-3dd987151362" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SF Profile Ids&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
 		<salesforce:query doc:name="Query Profile Ids" doc:id="b54f3295-d82d-4117-af8d-298c337029d8" config-ref="Salesforce_Config" target="profileIds" targetValue="#[output application/json&#10;---&#10;payload]">
-			<salesforce:salesforce-query ><![CDATA[Select Name, Id from Profile where Name IN (':bairdFoundationStandardUser', ':bairdSystemAdministrator', ':chatterFreeUser', ':bairdAssociate')]]></salesforce:salesforce-query>
+			<salesforce:salesforce-query ><![CDATA[Select Name, Id from Profile where Name IN (':bairdFoundationStandardUser', ':bairdSystemAdministrator', ':bairdAssociate')]]></salesforce:salesforce-query>
 			<salesforce:parameters ><![CDATA[#[output application/java
 ---
 {
-	"chatterFreeUser" : p('sfProfileName.chatterFreeUser'),
 	"bairdAssociate" : p('sfProfileName.bairdAssociate'),
 	"bairdFoundationStandardUser" : p('sfProfileName.bairdFoundationStandardUser'),
 	"bairdSystemAdministrator" : p('sfProfileName.bairdSystemAdministrator')
@@ -176,7 +175,7 @@ output application/json
 fun licenseType(item) = if ( (item.EmployeeIndicator == "Y") and
 	(((item.Location.CountryCode == "USA") and (item.EmploymentDetail.EmployeeTypeCode == "R")) or 
 	((["GBR","DEU"] contains item.Location.CountryCode) and (["R", "T", "L", "I"] contains item.EmploymentDetail.EmployeeTypeCode))) ) "Community"
-	else if ( !(vars.salesforceBFSystemAdministrator contains item.EmpId) and !(vars.salesforceBFStandardUserAdministrator contains item.EmpId) ) "Chatter"
+	else if ( !(vars.salesforceBFSystemAdministrator contains item.EmpId) and !(vars.salesforceBFStandardUserAdministrator contains item.EmpId) ) "EligibileForMatch"
 	else null
 ---
 vars.validWorkers map((item, index)-> {
@@ -316,7 +315,7 @@ fun getPhone(data) = do{
 ---
 (vars.validWorkers filter(downgradeEmpIds contains $.EmpId)) map(item, index) -> {
 	//APPEND.INVALID_TO_EMAIL_IN_ALL_ENVIRONMENTS_FOR CHATTER_LICENSE
-	"Email": if ( p('api.env') == "PROD" ) (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) ++ ".invalid")) else (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) ++ ".invalid")),
+	"Email": if ( p('api.env') == "PROD" ) (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]))) else (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) ++ ".invalid")),
 	"FederationIdentifier": item.EmpId,
 	"EmployeeNumber": item.EmpId,
 	"FirstName": item.FirstName,
@@ -327,7 +326,7 @@ fun getPhone(data) = do{
 	"ProfileId": if ( vars.salesforceBFSystemAdministrator contains item.EmpId ) systemAdminProfileId
 				 else if ( vars.salesforceBFStandardUserAdministrator contains item.EmpId ) standardUserProfileId
 				 else if ( vars.licenseType[item.EmpId][0] == "Community" ) associateProfileId
-				 else if ( vars.licenseType[item.EmpId][0] == "Chatter" ) chatterProfileId
+				 //else if ( vars.licenseType[item.EmpId][0] == "Chatter" ) chatterProfileId
 				 else null,
 	"CommunityNickname": item.UserName,
 	"IsActive": item.EmploymentDetail.Active,
