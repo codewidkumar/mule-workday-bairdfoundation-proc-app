@@ -68,6 +68,9 @@ var empIds = vars.validWorkers.EmpId
 			<logger level="INFO" doc:name="INFO: Log Info" doc:id="8d329f3f-a16a-4764-9933-f78fd64bf263" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Setting Employees IsActive = false, Counter: &quot; ++ vars.counter,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
 			<salesforce:update doc:name="Update IsActive to false" doc:id="c9c1dc84-81de-41b4-8112-a30a94153454" config-ref="Salesforce_Config" type="User" />
 		</foreach>
+		<salesforce:query doc:name="Query Contact" doc:id="bbf80c82-7a6b-46a7-b92e-18391ecd012e" config-ref="Salesforce_Config" target="contactDetails" targetValue="#[output application/json&#10;---&#10;payload]">
+			<salesforce:salesforce-query><![CDATA[SELECT Id, Employee_ID_c FROM Contact where RecordType.DeveloperName = 'Associate' and Employee_ID_c  != null]]></salesforce:salesforce-query>
+		</salesforce:query>
 		<logger level="INFO" doc:name="INFO: Log Info" doc:id="a07828db-67a5-4331-81cd-3dd987151362" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SF Profile Ids&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
 		<salesforce:query doc:name="Query Profile Ids" doc:id="b54f3295-d82d-4117-af8d-298c337029d8" config-ref="Salesforce_Config" target="profileIds" targetValue="#[output application/json&#10;---&#10;payload]">
 			<salesforce:salesforce-query ><![CDATA[Select Name, Id from Profile where Name IN (':bairdFoundationStandardUser', ':bairdSystemAdministrator', ':bairdAssociate')]]></salesforce:salesforce-query>
@@ -90,13 +93,12 @@ var empIds = vars.validWorkers.EmpId
 		</salesforce:query>
 		<logger level="INFO" doc:name="INFO: Log Info" doc:id="e067bfd7-0e6a-4796-9a31-f8fc90032c14" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SF User Role Ids&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
 		<salesforce:query doc:name="Query UserRole Ids" doc:id="6152cded-3c14-486d-9fcb-78e486a70d95" config-ref="Salesforce_Config" target="userRoleIds" targetValue="#[output application/json&#10;---&#10;payload]">
-			<salesforce:salesforce-query><![CDATA[Select Name, Id from UserRole where DeveloperName IN (':systemAdministrator', ':foundationStaff', ':associate')]]></salesforce:salesforce-query>
+			<salesforce:salesforce-query><![CDATA[Select Name, Id from UserRole where DeveloperName IN (':systemAdministrator', ':foundationStaff')]]></salesforce:salesforce-query>
 			<salesforce:parameters ><![CDATA[#[output application/java
 ---
 {
 	"systemAdministrator" : p('sfDeveloperName.systemAdministrator'),
-	"foundationStaff" : p('sfDeveloperName.foundationStaff'),
-	"associate" : p('sfDeveloperName.associate')
+	"foundationStaff" : p('sfDeveloperName.foundationStaff')
 }]]]></salesforce:parameters>
 		</salesforce:query>
 		<logger level="INFO" doc:name="INFO: Log Info" doc:id="47d91202-7ac9-442d-82b8-f0c7ef85fdfe" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Setting Payload for the Workers Sync&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
@@ -123,8 +125,8 @@ fun getUserRoleId(item) = if ( !(vars.userEmployeeNumbers.EmployeeNumber contain
 //   else log("WARNING", "WARNING : No Action for UserRoleId field. Field already exists in the target for EmpId: " ++ item.EmpId default "")
 fun calculateUserRoleId(item) = if ( vars.salesforceBFSystemAdministrator contains item.EmpId ) (vars.userRoleIds filter($.Name == p('sfUserRole.systemAdministrator'))).Id[0]
 	 else if ( vars.salesforceBFStandardUserAdministrator contains item.EmpId ) (vars.userRoleIds filter($.Name == p('sfUserRole.foundationStaff'))).Id[0]	 
-	 else if ( vars.licenseType[item.EmpId][0] == "Community" ) (vars.userRoleIds filter($.Name == p('sfUserRole.associate'))).Id[0]
-	 else if ( vars.licenseType[item.EmpId][0] == "EligibileForMatch" and (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).UserRoleId[0] == null ) null
+	 //else if ( vars.licenseType[item.EmpId][0] == "Community" ) (vars.userRoleIds filter($.Name == p('sfUserRole.associate'))).Id[0]
+	 //else if ( vars.licenseType[item.EmpId][0] == "EligibileForMatch" and (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).UserRoleId[0] == null ) null
 	 else do{
 	var logWarning = log("WARNING", "Not Eligible for license, Full Name: " ++ item.FirstName default "" ++ " " ++ item.LastName default "")
 	---
@@ -132,7 +134,10 @@ fun calculateUserRoleId(item) = if ( vars.salesforceBFSystemAdministrator contai
 }
 ---
 vars.validWorkers map((item, index) -> 
-	(if ( (vars.userEmployeeNumbers.EmployeeNumber contains item.EmpId) and !(vars.salesforceBFSystemAdministrator contains item.EmpId) and !(vars.salesforceBFStandardUserAdministrator contains item.EmpId) and (vars.licenseType[item.EmpId][0] == "EligibileForMatch") ) {
+	(if ( (vars.userEmployeeNumbers.EmployeeNumber contains item.EmpId)
+   and (
+((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).ProfileId) != associateProfileId) and (vars.licenseType[item.EmpId][0] != null) 
+) {
 	// LICENSE_DOWNGRADE_CASE
 		"Email": if ( p('api.env') == "PROD" ) (lower((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0])) else (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) ++ ".invalid")),
 		"FederationIdentifier": "#N/A",
@@ -160,16 +165,16 @@ vars.validWorkers map((item, index) ->
 						else (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) default "") ++ "-bairdfoundation." ++ lower(p('userName.sandboxName'))),
 			"ProfileId": if ( vars.salesforceBFSystemAdministrator contains item.EmpId ) systemAdminProfileId
 						 else if ( vars.salesforceBFStandardUserAdministrator contains item.EmpId ) standardUserProfileId
-						 else if ( vars.licenseType[item.EmpId][0] == "Community" ) associateProfileId
-						 else null,
+						 //else if ( vars.licenseType[item.EmpId][0] == "Community" ) associateProfileId
+						 else associateProfileId,
 			"CommunityNickname": item.UserName,
 			"IsActive": item.EmploymentDetail.Active,
-			"UserRoleId":
+			"UserRoleId": getUserRoleId(item),
 					// NEW USER CASE 	
-				if((uId != null) and ((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId))[0] == null)) uId
+				//if((uId != null) and ((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId))[0] == null)) uId
 					// LICENSE_UPGRADE_CASE FROM CHATTER TO OTHER - DON'T UPDATE USER_ROLE_ID	
-				else if ( (uId != null) and ((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).UserRoleId[0] == null) ) null
-		        else uId
+				//else if ( (uId != null) and ((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).UserRoleId[0] == null) ) null
+		        //else uId
 		}
 	})
 ) ++ 
@@ -201,7 +206,7 @@ vars.validWorkers map((item, index) ->
 		"Integration_Level_2_Name__c": item.BusinessUnitOrganization.Level2Descriptor.Name default "#N/A",
 		"Integration_Level_3_Name__c": item.BusinessUnitOrganization.Level3Descriptor.Name default "#N/A",
 		"Id": (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).Id[0],
-		"ContactId": "",
+		"ContactId": ((vars.contactDetails.Id)filter ($ == item.EmpId)) default "",
 		"Eligible_for_Match__c": if ((!(vars.salesforceBFSystemAdministrator contains item.EmpId) or !(vars.salesforceBFStandardUserAdministrator contains item.EmpId)) and ( vars.licenseType[item.EmpId][0] == "EligibileForMatch" ) ) "True"
 						 else "False"
 	}
@@ -243,9 +248,9 @@ fun getPhone(data) = do{
 				else (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) default "") ++ "-bairdfoundation." ++ lower(p('userName.sandboxName'))),
 	"ProfileId": if ( vars.salesforceBFSystemAdministrator contains item.EmpId ) systemAdminProfileId
 				 else if ( vars.salesforceBFStandardUserAdministrator contains item.EmpId ) standardUserProfileId
-				 else if ( vars.licenseType[item.EmpId][0] == "Community" ) associateProfileId
+				 //else if ( vars.licenseType[item.EmpId][0] == "Community" ) associateProfileId
 				 //else if ( vars.licenseType[item.EmpId][0] == "Chatter" ) chatterProfileId
-				 else null,
+				 else associateProfileId,
 	"CommunityNickname": item.UserName,
 	"IsActive": item.EmploymentDetail.Active,
 	"EmailEncodingKey": "ISO-8859-1",
@@ -272,7 +277,7 @@ fun getPhone(data) = do{
 	"Integration_Level_3_Name__c": item.BusinessUnitOrganization.Level3Descriptor.Name default "#N/A",
 	"UserRoleId": null,
 	"Id": null,
-	"ContactId": "",
+	"ContactId": ((vars.contactDetails.Id)filter ($ == item.EmpId)) default "",
 	"Eligible_for_Match__c": if ((!(vars.salesforceBFSystemAdministrator contains item.EmpId) or !(vars.salesforceBFStandardUserAdministrator contains item.EmpId)) and ( vars.licenseType[item.EmpId][0] == "EligibileForMatch" ) ) "True"
 						 else "False"
 }]]></ee:set-variable>

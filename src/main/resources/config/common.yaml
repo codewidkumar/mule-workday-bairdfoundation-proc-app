@@ -76,6 +76,6 @@ sfUserRole:
   
 #SalesforceDeveloperName
 sfDeveloperName:
-  associate: "Associate"
+  #associate: "Associate"
   foundationStaff: "Foundation_Staff"
   systemAdministrator: "SystemAdministrator"
