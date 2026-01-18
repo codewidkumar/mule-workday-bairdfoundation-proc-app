@@ -59,7 +59,7 @@ payload map ((item,value)->{
 })]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
-		<foreach doc:name="For Each" doc:id="fbf05581-50ea-4035-a712-f69357c05910" collection="#[payload]" batchSize="2">
+		<foreach doc:name="For Each" doc:id="fbf05581-50ea-4035-a712-f69357c05910" collection="#[payload]" batchSize="100">
 			<salesforce:update type="User" doc:name="Update User" doc:id="a3641db2-c2cb-4a00-a6ba-3e7f087b577b" config-ref="Salesforce_Config" />
 		</foreach>
 	</sub-flow>
@@ -101,7 +101,7 @@ payload map ((item,index)->{
 })]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
-		<foreach doc:name="For Each" doc:id="ef024bdf-5767-4873-b348-c2f3c5882163" collection="#[payload]" batchSize="2">
+		<foreach doc:name="For Each" doc:id="ef024bdf-5767-4873-b348-c2f3c5882163" collection="#[payload]" batchSize="100">
 			<salesforce:update type="Contact" doc:name="Update Contact" doc:id="31294b85-a872-4c1e-a02a-54dbe989a8ca" config-ref="Salesforce_Config" />
 		</foreach>
 	</sub-flow>
@@ -131,7 +131,7 @@ vars.validWorkers map ((item,index)->{
 })]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
-		<foreach doc:name="For Each" doc:id="9074f5b5-6d16-49e1-a960-ba893ce08864" collection="#[payload]" batchSize="2" >
+		<foreach doc:name="For Each" doc:id="9074f5b5-6d16-49e1-a960-ba893ce08864" collection="#[payload]" batchSize="100" >
 			<salesforce:update type="Contact" doc:name="Update Contact" doc:id="1da58767-b4f9-401d-9a3f-eb2130ebf3d8" config-ref="Salesforce_Config" />
 		</foreach>
 	</sub-flow>
