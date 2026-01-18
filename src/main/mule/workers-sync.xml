@@ -136,7 +136,7 @@ fun calculateUserRoleId(item) = if ( vars.salesforceBFSystemAdministrator contai
 vars.validWorkers map((item, index) -> 
 	(if ( (vars.userEmployeeNumbers.EmployeeNumber contains item.EmpId)
    and (
-((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).ProfileId) != associateProfileId) and (vars.licenseType[item.EmpId][0] != null) 
+((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).ProfileId[0]) != associateProfileId) and (vars.licenseType[item.EmpId][0] != null) 
 ) {
 	// LICENSE_DOWNGRADE_CASE
 		"Email": if ( p('api.env') == "PROD" ) (lower((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0])) else (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) ++ ".invalid")),
