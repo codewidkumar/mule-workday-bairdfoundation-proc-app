@@ -16,6 +16,7 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
 	<sub-flow name="upsert-user-contact-subflow" doc:id="2c176368-7485-4180-9f1a-ef4cd906a655" >
 		<flow-ref doc:name="Flow Reference to workers-sync-sub-flow" doc:id="e7f7f43e-0dbc-4871-b9d9-88d9f7011f9d" name="workers-sync-subflow" />
 		<flow-ref doc:name="Flow Reference to contacts-validation-final-subflow" doc:id="f5127487-e072-41ac-a8de-9755a12f9b44" name="contacts-validation-final-subflow" />
+		<flow-ref doc:name="Flow Reference to contacts-validation-final-subflow" doc:id="c0f17dd5-f881-4f25-8889-34c676b7398e" name="user-manager-update-subflow"/>
 	</sub-flow>
 	<sub-flow name="workers-sync-subflow" doc:id="10cc51db-5935-41c8-903b-0ce4c35f6199" >
 		<salesforce:query doc:name="Query User" doc:id="6bae857c-a386-4fc9-a640-056d3876947d" config-ref="Salesforce_Config">
@@ -104,7 +105,7 @@ payload map ((item,index)->{
 			<salesforce:update type="Contact" doc:name="Update Contact" doc:id="31294b85-a872-4c1e-a02a-54dbe989a8ca" config-ref="Salesforce_Config" />
 		</foreach>
 	</sub-flow>
-	<sub-flow name="upsertUserContactSub_Flow" doc:id="c4e027fa-bc73-4b4a-84a6-849544219a30" >
+	<sub-flow name="user-manager-update-subflow" doc:id="c4e027fa-bc73-4b4a-84a6-849544219a30" >
 		<salesforce:query doc:name="Query User" doc:id="186fde71-fb5c-475f-8ec9-e72576a91e0f" config-ref="Salesforce_Config" target="userSFEmployeeNumbers">
 			<salesforce:salesforce-query><![CDATA[SELECT Id, IsActive, EmployeeNumber FROM User where IsActive = true]]></salesforce:salesforce-query>
 		</salesforce:query>
