@@ -107,7 +107,7 @@ payload map ((item,index)->{
 	</sub-flow>
 	<sub-flow name="user-manager-update-subflow" doc:id="c4e027fa-bc73-4b4a-84a6-849544219a30" >
 		<salesforce:query doc:name="Query User" doc:id="186fde71-fb5c-475f-8ec9-e72576a91e0f" config-ref="Salesforce_Config" target="userSFEmployeeNumbers">
-			<salesforce:salesforce-query><![CDATA[SELECT Id, IsActive, EmployeeNumber FROM User where IsActive = true]]></salesforce:salesforce-query>
+			<salesforce:salesforce-query><![CDATA[SELECT Id, IsActive, EmployeeNumber FROM User where EmployeeNumber != null]]></salesforce:salesforce-query>
 		</salesforce:query>
 		<ee:transform doc:name="Set Manager &amp; User Mapping" doc:id="55a7627c-29af-48d1-a1e3-c5cf85b1fa61" >
 			<ee:message >
