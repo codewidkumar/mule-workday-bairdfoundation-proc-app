@@ -69,7 +69,7 @@ var empIds = vars.validWorkers.EmpId
 			<salesforce:update doc:name="Update IsActive to false" doc:id="c9c1dc84-81de-41b4-8112-a30a94153454" config-ref="Salesforce_Config" type="User" />
 		</foreach>
 		<salesforce:query doc:name="Query Contact" doc:id="bbf80c82-7a6b-46a7-b92e-18391ecd012e" config-ref="Salesforce_Config" target="contactDetails" targetValue="#[output application/json&#10;---&#10;payload]">
-			<salesforce:salesforce-query><![CDATA[SELECT Id, Employee_ID_c FROM Contact where RecordType.DeveloperName = 'Associate' and Employee_ID_c  != null]]></salesforce:salesforce-query>
+			<salesforce:salesforce-query><![CDATA[SELECT Id, Employee_ID__c FROM Contact where RecordType.DeveloperName = 'Associate' and Employee_ID__c  != null]]></salesforce:salesforce-query>
 		</salesforce:query>
 		<logger level="INFO" doc:name="INFO: Log Info" doc:id="a07828db-67a5-4331-81cd-3dd987151362" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SF Profile Ids&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
 		<salesforce:query doc:name="Query Profile Ids" doc:id="b54f3295-d82d-4117-af8d-298c337029d8" config-ref="Salesforce_Config" target="profileIds" targetValue="#[output application/json&#10;---&#10;payload]">
@@ -206,7 +206,7 @@ vars.validWorkers map((item, index) ->
 		"Integration_Level_2_Name__c": item.BusinessUnitOrganization.Level2Descriptor.Name default "#N/A",
 		"Integration_Level_3_Name__c": item.BusinessUnitOrganization.Level3Descriptor.Name default "#N/A",
 		"Id": (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).Id[0],
-		"ContactId": ((vars.contactDetails.Id)filter ($ == item.EmpId)) default "",
+		"ContactId": ((vars.contactDetails)filter($.Employee_ID__c == item.EmpId))[0].Id default "#N/A",
 		"Eligible_for_Match__c": if ((!(vars.salesforceBFSystemAdministrator contains item.EmpId) or !(vars.salesforceBFStandardUserAdministrator contains item.EmpId)) and ( vars.licenseType[item.EmpId][0] == "EligibileForMatch" ) ) "True"
 						 else "False"
 	}
@@ -277,7 +277,7 @@ fun getPhone(data) = do{
 	"Integration_Level_3_Name__c": item.BusinessUnitOrganization.Level3Descriptor.Name default "#N/A",
 	"UserRoleId": null,
 	"Id": null,
-	"ContactId": ((vars.contactDetails.Id)filter ($ == item.EmpId)) default "",
+	"ContactId": ((vars.contactDetails)filter($.Employee_ID__c == item.EmpId))[0].Id default "#N/A",
 	"Eligible_for_Match__c": if ((!(vars.salesforceBFSystemAdministrator contains item.EmpId) or !(vars.salesforceBFStandardUserAdministrator contains item.EmpId)) and ( vars.licenseType[item.EmpId][0] == "EligibileForMatch" ) ) "True"
 						 else "False"
 }]]></ee:set-variable>
