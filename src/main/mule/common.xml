@@ -61,23 +61,22 @@ payload ++ vars.failedRecords
 		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="c0c61a0e-febe-4099-8382-166bd15b76cb" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Sending Email Notification&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;EmailNotification&quot;&#10;}]" />
 		<until-successful maxRetries="${graphAPI.email.untilSuccessful.maxRetries}" doc:name="Until Successful" doc:id="8caa7dde-b1ca-40be-a24c-e4db9979f6b9" millisBetweenRetries="${graphAPI.email.untilSuccessful.interval}">
 			<try doc:name="Try" doc:id="41777c4a-8e07-4326-b6e6-8a3b5be00269" >
-				<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="d6f2a8b1-186e-4807-98e2-ee485a4886d5" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description default &quot;Something went wrong. Please contact support.&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;EmailNotification&quot;&#10;}]" />
-				<!-- [STUDIO:"POST  /send-email  Graph System API"]<http:request method="${graphAPI.email.method}" doc:name="POST  /send-email  Graph System API" doc:id="47efd9ab-973a-442a-bbc6-5b30de89db68" config-ref="HTTP_Request_configuration_Graph_Sys_Api" path="${graphAPI.email.path}">
+				<http:request method="${graphAPI.email.method}" doc:name="POST  /send-email  Graph System API" doc:id="47efd9ab-973a-442a-bbc6-5b30de89db68" config-ref="HTTP_Request_configuration_Graph_Sys_Api" path="${graphAPI.email.path}">
 					<http:headers ><![CDATA[#[output application/java
-&#45;&#45;-
+---
 {
 	"x-transactionId" : correlationId,
 	"client_secret": p('secure::graphAPI.clientSecret'),
 	"client_id": p('graphAPI.clientId'),
 	"source": "WorkdaySalesforceSyncApplication",
 	"x-msg-timestamp": (now() >> "America/Chicago") as String
-}&#93;&#93;&#93;></http:headers>
+}]]]></http:headers>
 					<http:uri-params ><![CDATA[#[output application/java
-&#45;&#45;-
+---
 {
 	"userId" : p('email.userId')
-}&#93;&#93;&#93;></http:uri-params>
-				</http:request> [STUDIO] -->
+}]]]></http:uri-params>
+				</http:request>
 				<error-handler >
 					<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="d9cb39dc-ec57-4fb3-a717-ffe8157d1c87" type="ANY" >
 						<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="f040a8f0-43cc-4269-88ca-3631c83b85ce" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description default &quot;Something went wrong. Please contact support.&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;EmailNotification&quot;&#10;}]" />
