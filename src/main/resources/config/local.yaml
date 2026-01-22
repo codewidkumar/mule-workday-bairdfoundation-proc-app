@@ -44,11 +44,15 @@ userName:
 email:
     userId: "d8a53564-1a50-433b-97f3-d64230d5b4d2"
     supportTeam:
-      to: "pjha@rwbaird.com,gkulkarni@rwbaird.com,apundir@rwbaird.com,sdhanapal@rwbaird.com,ansingh@rwbaird.com"
-      cc: "pjha@rwbaird.com"
-    businessUsers:   
-      to: "pjha@rwbaird.com,gkulkarni@rwbaird.com,apundir@rwbaird.com,sdhanapal@rwbaird.com,ansingh@rwbaird.com"
-      cc: "pjha@rwbaird.com"
+       to:"nikumar@rwbaird.com"
+       cc:"nikumar@rwbaird.com"
+      #to: "pjha@rwbaird.com,gkulkarni@rwbaird.com,apundir@rwbaird.com,sdhanapal@rwbaird.com,ansingh@rwbaird.com"
+      #cc: "pjha@rwbaird.com"
+    businessUsers:
+       to:"nikumar@rwbaird.com"
+       cc:"nikumar@rwbaird.com"   
+      #to: "pjha@rwbaird.com,gkulkarni@rwbaird.com,apundir@rwbaird.com,sdhanapal@rwbaird.com,ansingh@rwbaird.com"
+      #cc: "pjha@rwbaird.com"
     failedUsersRecords:
         subject: "LOCAL | Users unable to be activated/created in the Baird Foundation Org | "
         body: "Hello User,\n\nYou're receiving this notifiation during workers synchronization process.\nThe following Associate entries from Workday are missing required fields in Salesforce for the Baird Foundation.\n\nPlease find the attachment for more information/details.\n\nRegards,\nMulesoft Application"

@@ -17,6 +17,72 @@ http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/cu
 http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
 	<flow name="workday-workers-sf-sync" doc:id="48042fda-6821-4f0f-8425-fca10c33e150">
 		<logger level="INFO" doc:name="INFO: Log Start" doc:id="2dd50e1c-a2d8-4bc2-a4c1-7ec753c5f3d5" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Sync Workers Flow Started&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]"/>
+		<!-- [STUDIO:"Try"]<try doc:name="Try" doc:id="11d4c9c6-0839-4a6c-9e2a-c022ce0f8b20">
+			<until-successful maxRetries="${worker.untilSuccessful.maxRetries}" doc:name="Until Successful" doc:id="6c43c15b-dd68-4722-8c11-9c347d4de05b" millisBetweenRetries="${worker.untilSuccessful.interval}">
+				<try doc:name="Try" doc:id="eec5b842-3f29-4e23-9606-b353377be5ba">
+					<logger level="INFO" doc:name="INFO: Log Info" doc:id="ba4d0f44-2791-45f5-a232-1a81db3cfda8" message="#[%dw 2.0&#10;output application/json&#10;&#45;&#45;-&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SalesforceBFSystemAdministrator AD Group&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}&#93;" />
+					<http:request method="${graphAPI.members.method}" doc:name="Request to fetch SalesforceBFSystemAdministrator AD Group" doc:id="2240a3e0-87bc-4257-9a28-b888d2ad7229" config-ref="HTTP_Request_configuration_Graph_Sys_Api" path="${graphAPI.members.path}" target="salesforceBFSystemAdministrator" targetValue="#[payload.response.employeeId&#93;">
+						<http:headers><![CDATA[#[output application/java
+&#45;&#45;-
+{
+	"x-transactionId" : correlationId,
+	"client_secret": p('secure::graphAPI.clientSecret'),
+	"client_id": p('graphAPI.clientId'),
+	"source": "WorkdaySalesforceSyncApplication",
+	"x-msg-timestamp": (now() >> "America/Chicago") as String
+}&#93;&#93;&#93;></http:headers>
+						<http:uri-params><![CDATA[#[output application/java
+&#45;&#45;-
+{
+	"groupId" : p('groupId.adminUser')
+}&#93;&#93;&#93;></http:uri-params>
+					</http:request>
+					<logger level="INFO" doc:name="INFO: Log Info1" doc:id="2aacbcbc-252f-41c2-9239-8148cd1e671a" message="#[%dw 2.0&#10;output application/json&#10;&#45;&#45;-&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SalesforceBFStandardUserAdministrator AD Group&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}&#93;" />
+					<http:request method="${graphAPI.members.method}" doc:name="Request to fetch SalesforceBFStandardUserAdministrator AD Group" doc:id="4456d22a-3bed-4def-8d87-8be4041ba485" config-ref="HTTP_Request_configuration_Graph_Sys_Api" path="${graphAPI.members.path}" target="salesforceBFStandardUserAdministrator" targetValue="#[payload.response.employeeId&#93;">
+						<http:headers><![CDATA[#[output application/java
+&#45;&#45;-
+{
+	"x-transactionId" : correlationId,
+	"client_secret": p('secure::graphAPI.clientSecret'),
+	"client_id": p('graphAPI.clientId'),
+	"source": "WorkdaySalesforceSyncApplication",
+	"x-msg-timestamp": (now() >> "America/Chicago") as String
+}&#93;&#93;&#93;></http:headers>
+						<http:uri-params><![CDATA[#[output application/java
+&#45;&#45;-
+{
+	"groupId" : p('groupId.standardUser')
+}&#93;&#93;&#93;></http:uri-params>
+					</http:request>
+					<error-handler>
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue for Connectivity  Failures" doc:id="dd5a1e3d-e6ef-44d4-a5d6-325fde3bc97c" when='#[error.errorType.identifier != "CONNECTIVITY"&#93;'>
+							<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="c1b66c05-23c0-40ee-b457-3bc73243e2e7" message="#[%dw 2.0&#10;output application/json&#10;&#45;&#45;-&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}&#93;" />
+							<ee:transform doc:name="Set errorObject" doc:id="9b516110-20ae-4869-9df3-3937d254a31e">
+								<ee:message>
+									<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+&#45;&#45;-
+{
+}&#93;&#93;></ee:set-payload>
+								</ee:message>
+								<ee:variables>
+									<ee:set-variable variableName="errorObject"><![CDATA[%dw 2.0
+output application/java
+&#45;&#45;-
+error&#93;&#93;></ee:set-variable>
+								</ee:variables>
+							</ee:transform>
+						</on-error-continue>
+					</error-handler>
+				</try>
+			</until-successful>
+			<validation:is-true doc:name="Is true" doc:id="4511326c-4669-4a2a-a6e9-9bb8b3fb733d" expression="#[vars.errorObject == null&#93;" message="#[vars.errorObject.detailedDescription&#93;" />
+			<error-handler>
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate for other erros" doc:id="0a166d5d-4660-4a21-88a4-1237e5e1094d" type="ANY">
+					<logger level="ERROR" doc:name="log-error" doc:id="b0a36e75-14ec-4f02-8b19-45e27e749023" message="#[%dw 2.0&#10;output application/json&#10;&#45;&#45;-&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: vars.errorObject.detailedDescription,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}&#93;" />
+				</on-error-propagate>
+			</error-handler>
+		</try> [STUDIO] -->
 		<async doc:name="Async" doc:id="0958f076-b3a4-4860-b099-ee2f0cee04db">
 			<choice doc:name="Check For Invalid Workers" doc:id="95b20a6f-95fb-4217-a150-0b57586f8070">
 				<when expression="#[sizeOf(vars.invalidWorkers) &gt; 0]">
@@ -73,12 +139,12 @@ var empIds = vars.validWorkers.EmpId
 		</salesforce:query>
 		<logger level="INFO" doc:name="INFO: Log Info" doc:id="a07828db-67a5-4331-81cd-3dd987151362" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SF Profile Ids&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
 		<salesforce:query doc:name="Query Profile Ids" doc:id="b54f3295-d82d-4117-af8d-298c337029d8" config-ref="Salesforce_Config" target="profileIds" targetValue="#[output application/json&#10;---&#10;payload]">
-			<salesforce:salesforce-query ><![CDATA[Select Name, Id from Profile where Name IN (':bairdFoundationStandardUser', ':bairdSystemAdministrator', ':bairdAssociate')]]></salesforce:salesforce-query>
+			<salesforce:salesforce-query ><![CDATA[Select Name, Id from Profile where Name IN (':bairdFoundationStandardUser', ':bairdSystemAdministrator', ':communityPlusLogin')]]></salesforce:salesforce-query>
 			<salesforce:parameters ><![CDATA[#[output application/java
 ---
 {
-	"bairdAssociate" : p('sfProfileName.bairdAssociate'),
 	"bairdFoundationStandardUser" : p('sfProfileName.bairdFoundationStandardUser'),
+	"communityPlusLogin" : p('sfProfileName.communityPlusLogin'),
 	"bairdSystemAdministrator" : p('sfProfileName.bairdSystemAdministrator')
 }]]]></salesforce:parameters>
 		</salesforce:query>
@@ -102,21 +168,40 @@ var empIds = vars.validWorkers.EmpId
 }]]]></salesforce:parameters>
 		</salesforce:query>
 		<logger level="INFO" doc:name="INFO: Log Info" doc:id="47d91202-7ac9-442d-82b8-f0c7ef85fdfe" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Setting Payload for the Workers Sync&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+		<ee:transform doc:name="Calculate License" doc:id="4deb450b-3f94-41d9-b697-199548b74d9c">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="licenseType"><![CDATA[
+%dw 2.0
+output application/json
+fun licenseType(item) =
+  if ( (item.EmployeeIndicator == "Y") and
+    (((item.Location.CountryCode == "USA") and (item.EmploymentDetail.EmployeeTypeCode == "R")) or
+      ((["GBR", "DEU"] contains item.Location.CountryCode) and (["R", "T", "L", "I"] contains item.EmploymentDetail.EmployeeTypeCode))) and
+    (!(vars.salesforceBFSystemAdministrator contains item.EmpId) and !(vars.salesforceBFStandardUserAdministrator contains item.EmpId)) ) "EligibleForMatch" 
+  else null
+---
+vars.validWorkers map ((item, index) -> {
+	(item.EmpId): licenseType(item)
+})
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
 		<ee:transform doc:name="Set Payload for Bulk Upsert" doc:id="45c470e7-1f5f-4207-add9-e12a5eff4808" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/json
 var systemAdminProfileId = (vars.profileIds filter($.Name == p('sfProfileName.bairdSystemAdministrator'))).Id[0]
 var standardUserProfileId = (vars.profileIds filter($.Name == p('sfProfileName.bairdFoundationStandardUser'))).Id[0]
-var associateProfileId = (vars.profileIds filter($.Name == p('sfProfileName.bairdAssociate'))).Id[0]
+var communityPlusLogin = (vars.profileIds filter($.Name == p('sfProfileName.communityPlusLogin'))).Id[0]
 //var chatterProfileId = (vars.profileIds filter($.Name == p('sfProfileName.chatterFreeUser'))).Id[0]
 fun getPhone(data) = do{
-    var AreaCode = data.AreaCode
-    var ContactNumber = data.ContactNumber
-    ---
-    if(data != null  and AreaCode != null and ContactNumber != null) (AreaCode ++ "-" ++ ContactNumber)
-    else if(data != null and AreaCode != null and ContactNumber == null) AreaCode
-    else if(data != null and AreaCode == null and ContactNumber != null) ContactNumber
+	var AreaCode = data.AreaCode
+	var ContactNumber = data.ContactNumber
+	---
+	if ( data != null and AreaCode != null and ContactNumber != null ) (AreaCode ++ "-" ++ ContactNumber)
+    else if ( data != null and AreaCode != null and ContactNumber == null ) AreaCode
+    else if ( data != null and AreaCode == null and ContactNumber != null ) ContactNumber
     else "#N/A"
 }
 fun getUserRoleId(item) = if ( !(vars.userEmployeeNumbers.EmployeeNumber contains item.EmpId) or 
@@ -127,90 +212,87 @@ fun calculateUserRoleId(item) = if ( vars.salesforceBFSystemAdministrator contai
 	 else if ( vars.salesforceBFStandardUserAdministrator contains item.EmpId ) (vars.userRoleIds filter($.Name == p('sfUserRole.foundationStaff'))).Id[0]	 
 	 //else if ( vars.licenseType[item.EmpId][0] == "Community" ) (vars.userRoleIds filter($.Name == p('sfUserRole.associate'))).Id[0]
 	 //else if ( vars.licenseType[item.EmpId][0] == "EligibileForMatch" and (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).UserRoleId[0] == null ) null
-	 else do{
-	var logWarning = log("WARNING", "Not Eligible for license, Full Name: " ++ item.FirstName default "" ++ " " ++ item.LastName default "")
-	---
-	null
-}
+	 else null
 ---
 vars.validWorkers map((item, index) -> 
-	(if ( (vars.userEmployeeNumbers.EmployeeNumber contains item.EmpId)
-   and (
-((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).ProfileId[0]) != associateProfileId) and (vars.licenseType[item.EmpId][0] != null) 
-) {
+	(if ( (vars.userEmployeeNumbers.EmployeeNumber contains item.EmpId) and 
+	 (((((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).ProfileId[0]) != communityPlusLogin) and  !(vars.salesforceBFSystemAdministrator contains item.EmpId) and !(vars.salesforceBFStandardUserAdministrator contains item.EmpId)) or
+		((((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).ProfileId[0]) == communityPlusLogin) and  ((vars.salesforceBFSystemAdministrator contains item.EmpId) or (vars.salesforceBFStandardUserAdministrator contains item.EmpId)))) ) {
 	// LICENSE_DOWNGRADE_CASE
-		"Email": if ( p('api.env') == "PROD" ) (lower((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0])) else (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) ++ ".invalid")),
-		"FederationIdentifier": "#N/A",
-		"EmployeeNumber": "#N/A",
-		"Alias": "X" ++ item.EmpId,
-		"Username": if ( p('api.env') == "PROD" ) ("OLD" ++ lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) default "") ++ "-bairdfoundation")
+	"Email": if ( p('api.env') == "PROD" ) (lower((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0])) else (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) ++ ".invalid")),
+	"FederationIdentifier": "#N/A",
+	"EmployeeNumber": "#N/A",
+	"Alias": "X" ++ item.EmpId,
+	"Username": if ( p('api.env') == "PROD" ) ("OLD" ++ lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) default "") ++ "-bairdfoundation")
 					else ("OLD" ++ lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) default "") ++ "-bairdfoundation." ++ lower(p('userName.sandboxName'))),
-		"ProfileId": (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).ProfileId[0],
-		"CommunityNickname": "OLD" ++ item.UserName,
-		"IsActive": false,
-		"UserRoleId": (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).UserRoleId[0]
-	}	
-	else (
-		do{
-		var uId = getUserRoleId(item)
-		---
-		{
-			"Email": if ( (p('api.env') == "PROD") and  (uId != null)) (lower((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]))
+	"ProfileId": (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).ProfileId[0],
+	"CommunityNickname": "OLD" ++ item.UserName,
+	"IsActive": false,
+	"UserRoleId": (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).UserRoleId[0]
+}	
+	else (do{
+	var uId = getUserRoleId(item)
+	---
+	{
+		"Email": if ( (p('api.env') == "PROD") and  (uId != null) ) (lower((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]))
 						// APPEND_.INVALID_FOR_CHATTER_LICENSE_IN_PROD
 				else (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) ++ ".invalid")),
-			"FederationIdentifier": item.EmpId,
-			"EmployeeNumber": item.EmpId,
-			"Alias": item.EmpId,
-			"Username": if ( p('api.env') == "PROD" ) (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) default "") ++ "-bairdfoundation")
+		"FederationIdentifier": item.EmpId,
+		"EmployeeNumber": item.EmpId,
+		"Alias": item.EmpId,
+		"Username": if ( p('api.env') == "PROD" ) (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) default "") ++ "-bairdfoundation")
 						else (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) default "") ++ "-bairdfoundation." ++ lower(p('userName.sandboxName'))),
-			"ProfileId": if ( vars.salesforceBFSystemAdministrator contains item.EmpId ) systemAdminProfileId
+		"ProfileId": if ( vars.salesforceBFSystemAdministrator contains item.EmpId ) systemAdminProfileId
 						 else if ( vars.salesforceBFStandardUserAdministrator contains item.EmpId ) standardUserProfileId
-						 //else if ( vars.licenseType[item.EmpId][0] == "Community" ) associateProfileId
-						 else associateProfileId,
-			"CommunityNickname": item.UserName,
-			"IsActive": item.EmploymentDetail.Active,
-			"UserRoleId": getUserRoleId(item),
-					// NEW USER CASE 	
-				//if((uId != null) and ((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId))[0] == null)) uId
-					// LICENSE_UPGRADE_CASE FROM CHATTER TO OTHER - DON'T UPDATE USER_ROLE_ID	
-				//else if ( (uId != null) and ((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).UserRoleId[0] == null) ) null
-		        //else uId
-		}
-	})
-) ++ 
+						 //else if ( vars.licenseType[item.EmpId][0] == "Community" ) communityPlusLogin
+						 else communityPlusLogin,
+		"CommunityNickname": item.UserName,
+		"IsActive": item.EmploymentDetail.Active,
+		"UserRoleId": getUserRoleId(item),
+	// NEW USER CASE 	
+	// if((uId != null) and ((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId))[0] == null)) uId
+	// LICENSE_UPGRADE_CASE FROM CHATTER TO OTHER - DON'T UPDATE USER_ROLE_ID	
+	// else if ( (uId != null) and ((vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).UserRoleId[0] == null) ) null
+	// else uId
+	}
+})) ++ 
 //CommonFields
 	{
-		
-		"FirstName": item.FirstName,
-		"LastName": item.LastName,
-		"EmailEncodingKey": "ISO-8859-1",
-		"TimeZoneSidKey": "America/Chicago",
-		"LocaleSidKey": "en_US",
-		"LanguageLocaleKey": "en_US",
-		"Phone": getPhone((item.Phones filter($.TelecommunicationsNumberTypeCode == "WORK" and $.Type == "Landline"))[0]),
-		"Title": item.ProfessionalTitleName default "#N/A",
-		"CompanyName": "Baird",
-		"Department": item.Department.Name  default "#N/A",
-		"Division": if ( item.BusinessUnitOrganization == null or !(vars.businessUnitIds.Baird_BU_ID__c contains item.BusinessUnitOrganization.Descriptor.Id) ) "#N/A" 
+	"FirstName": item.FirstName,
+	"LastName": item.LastName,
+	"EmailEncodingKey": "ISO-8859-1",
+	"TimeZoneSidKey": "America/Chicago",
+	"LocaleSidKey": "en_US",
+	"LanguageLocaleKey": "en_US",
+	"Phone": getPhone((item.Phones filter($.TelecommunicationsNumberTypeCode == "WORK" and $.Type == "Landline"))[0]),
+	"Title": item.ProfessionalTitleName default "#N/A",
+	"CompanyName": "Baird",
+	"Department": item.Department.Name  default "#N/A",
+	"Division": if ( item.BusinessUnitOrganization == null or !(vars.businessUnitIds.Baird_BU_ID__c contains item.BusinessUnitOrganization.Descriptor.Id) ) "#N/A" 
 			else if ( item.BusinessUnitOrganization.Level <= 2 ) item.BusinessUnitOrganization.Descriptor.Name
-			else if	(vars.businessUnitIds.Baird_BU_ID__c contains item.BusinessUnitOrganization.Level2Descriptor.Id)item.BusinessUnitOrganization.Level2Descriptor.Name
+			else if ( vars.businessUnitIds.Baird_BU_ID__c contains item.BusinessUnitOrganization.Level2Descriptor.Id ) item.BusinessUnitOrganization.Level2Descriptor.Name
 			else "#N/A",
-		"Street": trim(item.Location.Address1 default "" ++ " " ++ (item.Location.Address2 default "") ++ " " ++ (item.Location.Address3 default "") ++ " " ++ (item.Location.Address4 default "")),
-		"City": item.Location.CityName default "#N/A",
-		"State": item.Location.StateAbbreviation default "#N/A",
-		"PostalCode": item.Location.PostalCode default "#N/A",
-		"Country": item.Location.CountryCode default "#N/A",
-		"GL_Code__c": item.Department.GlCode default "#N/A",
-		"Integration_BU_Name__c": item.BusinessUnitOrganization.Descriptor.Name default "#N/A",
-		"Integration_Department_Name__c": item.Department.Name default "#N/A",
-		"Integration_Level_2_Name__c": item.BusinessUnitOrganization.Level2Descriptor.Name default "#N/A",
-		"Integration_Level_3_Name__c": item.BusinessUnitOrganization.Level3Descriptor.Name default "#N/A",
-		"Id": (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).Id[0],
-		"ContactId": ((vars.contactDetails)filter($.Employee_ID__c == item.EmpId))[0].Id default "#N/A",
-		"Eligible_for_Match__c": if ((!(vars.salesforceBFSystemAdministrator contains item.EmpId) or !(vars.salesforceBFStandardUserAdministrator contains item.EmpId)) and ( vars.licenseType[item.EmpId][0] == "EligibileForMatch" ) ) "True"
+	"Street": trim(item.Location.Address1 default "" ++ " " ++ (item.Location.Address2 default "") ++ " " ++ (item.Location.Address3 default "") ++ " " ++ (item.Location.Address4 default "")),
+	"City": item.Location.CityName default "#N/A",
+	"State": item.Location.StateAbbreviation default "#N/A",
+	"PostalCode": item.Location.PostalCode default "#N/A",
+	"Country": item.Location.CountryCode default "#N/A",
+	"GL_Code__c": item.Department.GlCode default "#N/A",
+	"Integration_BU_Name__c": item.BusinessUnitOrganization.Descriptor.Name default "#N/A",
+	"Integration_Department_Name__c": item.Department.Name default "#N/A",
+	"Integration_Level_2_Name__c": item.BusinessUnitOrganization.Level2Descriptor.Name default "#N/A",
+	"Integration_Level_3_Name__c": item.BusinessUnitOrganization.Level3Descriptor.Name default "#N/A",
+	"Id": (vars.userEmployeeNumbers filter($.EmployeeNumber == item.EmpId)).Id[0],
+	 "ContactId": do{
+		var contactData = (vars.contactDetails filter($.EmployeeNumber == item.EmpId))[0]
+		---
+		if ( (contactData != null) and 
+	(!(vars.salesforceBFSystemAdministrator contains item.EmpId) and !(vars.salesforceBFStandardUserAdministrator contains item.EmpId)) ) contactData.Id
+else "#N/A"
+	},
+	"Eligible_for_Match__c": if ( vars.licenseType[item.EmpId][0] == "EligibleForMatch" ) "True"
 						 else "False"
-	}
-)]]></ee:set-payload>
+})]]></ee:set-payload>
 			</ee:message>
 			<ee:variables >
 			</ee:variables>
@@ -224,7 +306,7 @@ output application/json
 var downgradeEmpIds = (payload filter($.Alias  startsWith("X"))).Alias map($[1 to -1])
 var systemAdminProfileId = (vars.profileIds filter($.Name == p('sfProfileName.bairdSystemAdministrator'))).Id[0]
 var standardUserProfileId = (vars.profileIds filter($.Name == p('sfProfileName.bairdFoundationStandardUser'))).Id[0]
-var associateProfileId = (vars.profileIds filter($.Name == p('sfProfileName.bairdAssociate'))).Id[0]
+var communityPlusLogin = (vars.profileIds filter($.Name == p('sfProfileName.communityPlusLogin'))).Id[0]
 //var chatterProfileId = (vars.profileIds filter($.Name == p('sfProfileName.chatterFreeUser'))).Id[0]
 fun getPhone(data) = do{
     var AreaCode = data.AreaCode
@@ -248,9 +330,9 @@ fun getPhone(data) = do{
 				else (lower(((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) default "") ++ "-bairdfoundation." ++ lower(p('userName.sandboxName'))),
 	"ProfileId": if ( vars.salesforceBFSystemAdministrator contains item.EmpId ) systemAdminProfileId
 				 else if ( vars.salesforceBFStandardUserAdministrator contains item.EmpId ) standardUserProfileId
-				 //else if ( vars.licenseType[item.EmpId][0] == "Community" ) associateProfileId
+				 //else if ( vars.licenseType[item.EmpId][0] == "Community" ) communityPlusLogin
 				 //else if ( vars.licenseType[item.EmpId][0] == "Chatter" ) chatterProfileId
-				 else associateProfileId,
+				 else communityPlusLogin,
 	"CommunityNickname": item.UserName,
 	"IsActive": item.EmploymentDetail.Active,
 	"EmailEncodingKey": "ISO-8859-1",
@@ -277,8 +359,14 @@ fun getPhone(data) = do{
 	"Integration_Level_3_Name__c": item.BusinessUnitOrganization.Level3Descriptor.Name default "#N/A",
 	"UserRoleId": null,
 	"Id": null,
-	"ContactId": ((vars.contactDetails)filter($.Employee_ID__c == item.EmpId))[0].Id default "#N/A",
-	"Eligible_for_Match__c": if ((!(vars.salesforceBFSystemAdministrator contains item.EmpId) or !(vars.salesforceBFStandardUserAdministrator contains item.EmpId)) and ( vars.licenseType[item.EmpId][0] == "EligibileForMatch" ) ) "True"
+	"ContactId": do{
+		var contactData = (vars.contactDetails filter($.EmployeeNumber == item.EmpId))[0]
+		---
+		if ( (contactData != null) and 
+	(!(vars.salesforceBFSystemAdministrator contains item.EmpId) and !(vars.salesforceBFStandardUserAdministrator contains item.EmpId)) ) contactData.Id 
+else "#N/A"
+	},
+	"Eligible_for_Match__c": if ( vars.licenseType[item.EmpId][0] == "EligibileForMatch" ) "True"
 						 else "False"
 }]]></ee:set-variable>
 				<ee:set-variable variableName="workerspayload" ><![CDATA[%dw 2.0
