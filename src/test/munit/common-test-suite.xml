@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+	xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="common-test-suite.xml" />
+	<munit:test name="send-mail-graph-sys-api-test-success"
+		description="Test sending email via Graph API successfully">
+		<munit:behavior>
+			<munit-tools:mock-when processor="http:request"
+				doc:name="Mock Graph API Request">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="POST  /send-email  Graph System API"
+						attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value='#[{"status": "Email Sent"}]' />
+					<munit-tools:attributes
+						value="#[{ 'statusCode': 202 }]" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit:set-event doc:name="Set Email Payload">
+				<munit:payload
+					value='#[{
+                "to": "user@example.com",
+                "subject": "Test Subject",
+                "body": "Test Body",
+                "attachments": []
+            }]' />
+				<munit:variables>
+					<munit:variable key="correlationId"
+						value="TEST-EMAIL-ID" />
+				</munit:variables>
+			</munit:set-event>
+		</munit:behavior>
+
+		<munit:execution>
+			<flow-ref name="send-mail-graph-sys-api" />
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:verify-call
+				processor="http:request" times="1" doc:name="Verify Graph API Call">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="POST  /send-email  Graph System API"
+						attributeName="doc:name" />
+				</munit-tools:with-attributes>
+			</munit-tools:verify-call>
+		</munit:validation>
+	</munit:test>
+	<munit:test
+		name="sf-check-job-status-test-success-with-failures"
+		description="Test job status check captures failed records">
+		<munit:behavior>
+			<munit-tools:mock-when
+				processor="salesforce:get-job-state-bulk-api-v2">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="8b648c15-a055-43f0-8e43-8c8c1dafd37a"
+						attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value='#[{"state": "JobComplete", "id": "7501"}]' />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when
+				processor="salesforce:retrieve-job-failed-results-bulk-v2">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="3f130cc3-2192-4464-b290-d8ebe6b0dbd2"
+						attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value='#[[
+                    {"sf__Id": "0031", "sf__Error": "Required field missing", "Employee_ID__c": "E001"},
+                    {"sf__Id": "0032", "sf__Error": "Invalid Email", "Employee_ID__c": "E002"}
+                ]]' />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit:set-event
+				doc:name="Set jobIds and failedRecords">
+				<munit:variables>
+					<munit:variable key="jobIds" value='#[[ "7501" ]]' />
+					<munit:variable key="failedRecords" value="#[[]]" />
+					<munit:variable key="correlationId" value="TEST-ID" />
+					<munit:variable key="businessKey" value="Contact" />
+				</munit:variables>
+			</munit:set-event>
+		</munit:behavior>
+
+		<munit:execution>
+			<flow-ref name="sf-check-job-status" />
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-that
+				expression="#[sizeOf(vars.failedRecords)]"
+				is="#[MunitTools::equalTo(2)]"
+				doc:name="Verify 2 failed records were captured" />
+
+			<munit-tools:assert-that
+				expression="#[vars.failedRecords[0].Employee_ID__c]"
+				is="#[MunitTools::equalTo('E001')]"
+				doc:name="Verify first failed record data" />
+		</munit:validation>
+	</munit:test>
+	<munit:test name="sf-check-job-status-test-job-failed"
+		description="Test that JOB:FAILED is raised when Salesforce job state is Failed"
+		expectedErrorType="JOB:FAILED">
+		<munit:behavior>
+			<munit-tools:mock-when
+				processor="salesforce:get-job-state-bulk-api-v2">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="8b648c15-a055-43f0-8e43-8c8c1dafd37a"
+						attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value='#[{ 
+                    "state": "Failed", 
+                    "id": "7501", 
+                    "errorMessage": "Internal Salesforce Error" 
+                }]' />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit:set-event doc:name="Set jobIds">
+				<munit:variables>
+					<munit:variable key="jobIds" value='#[[ "7501" ]]' />
+					<munit:variable key="correlationId"
+						value="TEST-FAIL-ID" />
+					<munit:variable key="businessKey" value="Contact" />
+				</munit:variables>
+			</munit:set-event>
+		</munit:behavior>
+
+		<munit:execution>
+			<flow-ref name="sf-check-job-status" />
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-that
+				expression="#[vars.isError]" is="#[MunitTools::equalTo(true)]"
+				doc:name="Assert isError flag is true" />
+
+			<munit-tools:verify-call
+				processor="mule:raise-error" times="1">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="JOB:FAILED" attributeName="type" />
+				</munit-tools:with-attributes>
+			</munit-tools:verify-call>
+		</munit:validation>
+	</munit:test>
+</mule>

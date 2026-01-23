@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+	xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+
+	<munit:config name="account-sync-test-suite.xml" />
+
+	<munit:test
+		name="upsert-accounts-to-salesforce-flow-test-success"
+		description="Test Account Upsert with mixed success/failure">
+		<munit:behavior>
+			<munit-tools:mock-when
+				doc:name="Mock Salesforce Upsert" processor="salesforce:upsert">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="Upsert Accounts" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value='#[%dw 2.0
+output application/json
+---
+{
+    "items": [
+        { "id": "001SuccessId", "successful": true, "statusCode": "200", "message": "Created" },
+        { "id": "001FailureId", "successful": false, "statusCode": "REQUIRED_FIELD_MISSING", "message": "Missing Name" }
+    ]
+}]'
+						mediaType="application/json" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit:set-event doc:name="Set Input Payload">
+				<munit:payload
+					value='#[%dw 2.0
+output application/json
+---
+[
+    {
+        "Baird_BU_ID__c": "BU-100",
+        "LevelDescriptor": "L1",
+        "Name": "Account One",
+        "Parent_Id": "P-001"
+    },
+    {
+        "Baird_BU_ID__c": "BU-200",
+        "LevelDescriptor": "L1",
+        "Name": "Account Two",
+        "Parent_Id": "P-002"
+    }
+]]'
+					mediaType="application/json" />
+				<munit:variables>
+					<munit:variable key="correlationId"
+						value="TEST-ACC-ID" />
+				</munit:variables>
+			</munit:set-event>
+		</munit:behavior>
+
+		<munit:execution>
+			<flow-ref
+				doc:name="Flow-ref to upsert-accounts-to-salesforce-flow"
+				name="upsert-accounts-to-salesforce-flow" />
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:verify-call
+				doc:name="Verify Upsert Call" processor="salesforce:upsert"
+				times="1" />
+
+			<munit-tools:assert-that
+				doc:name="Assert 1 Failed Record Captured"
+				expression="#[sizeOf(vars.AccountFailedRecords)]"
+				is="#[MunitTools::equalTo(1)]" />
+
+			<munit-tools:assert-that
+				doc:name="Assert buAndSFID exists"
+				expression="#[sizeOf(vars.buAndSFID)]"
+				is="#[MunitTools::equalTo(2)]" />
+
+			<munit-tools:assert-that
+				doc:name="Verify First Success ID"
+				expression="#[vars.buAndSFID[0].Id]"
+				is="#[MunitTools::equalTo('001SuccessId')]" />
+		</munit:validation>
+	</munit:test>
+	<munit:test
+		name="baird-workday-integration-upsert-bu-accounts-Flow-Test"
+		description="Test hierarchical sync">
+		<munit:behavior>
+			<munit-tools:mock-when
+				doc:name="Mock RecordType Query" processor="salesforce:query">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="Query Account RecordTypeId" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:variables>
+						<munit-tools:variable key="queryResult"
+							value="#[{Id: ['012300000000abc']}]" />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when
+				doc:name="Mock Account Upsert Subflow" processor="mule:flow-ref">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="upsert-accounts-to-salesforce-flow"
+						attributeName="name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:variables>
+						<munit-tools:variable key="buAndSFID"
+							value="#[[{'Baird_BU_ID__c': 'L1-001', 'Id': 'SF-L1-001'}]]" />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when
+				doc:name="Mock Email API" processor="mule:flow-ref">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="send-mail-graph-sys-api" attributeName="name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return />
+			</munit-tools:mock-when>
+		</munit:behavior>
+
+		<munit:execution>
+			<munit:set-event doc:name="Set Input Payload">
+				<munit:payload
+					value='#[%dw 2.0
+output application/json
+---
+[
+    {"Level1Descriptor": [{"Id": "L1-001", "Name": "Level 1", "ParentId": null}]},
+    {"Level2Descriptor": [{"Id": "L2-001", "Name": "Level 2", "ParentId": "L1-001"}]},
+    {"Level3Descriptor": []},
+    {"Level4Descriptor": []},
+    {"Level5Descriptor": []},
+    {"Level6Descriptor": []}
+]]'
+					mediaType="application/json" />
+				<munit:variables>
+					<munit:variable key="correlationId"
+						value="TEST-SYNC-123" />
+				</munit:variables>
+			</munit:set-event>
+			<flow-ref doc:name="Flow-ref"
+				name="baird-workday-integration-upsert-bu-accounts-Flow" />
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:verify-call
+				doc:name="Verify Subflow Called" processor="mule:flow-ref"
+				atLeast="1">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="upsert-accounts-to-salesforce-flow"
+						attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:verify-call>
+		</munit:validation>
+	</munit:test>
+</mule>

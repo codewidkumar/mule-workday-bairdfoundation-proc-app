@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+	xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="bu-validation-test-suite.xml" />
+	<munit:test name="workday-bu-sf-sync-test"
+		description="Test BU validation and SF sync flow">
+
+
+		<munit:behavior>
+
+
+			<munit-tools:mock-when processor="flow-ref">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						attributeName="name" whereValue="bu-validation-subflow" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<!-- Assume validation passes and returns BU payload -->
+					<munit-tools:payload
+						value="#[
+                  [
+                    {
+                      Baird_BU_ID__c: 'BU001',
+                      Name: 'Business Unit 1'
+                    }
+                  ]
+                ]" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+
+			<munit-tools:mock-when processor="flow-ref">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						attributeName="name"
+						whereValue="baird-workday-integration-upsert-bu-accounts-Flow" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value="#['UPSERT_SUCCESS']" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+
+			<munit:set-event>
+				<munit:payload
+					value="#[
+              [
+                {
+                  Baird_BU_ID__c: 'BU001',
+                  Name: 'Business Unit 1'
+                }
+              ]
+            ]" />
+				<munit:variables>
+					<munit:variable key="correlationId"
+						value="TEST-CORR-ID" />
+				</munit:variables>
+			</munit:set-event>
+
+		</munit:behavior>
+
+
+		<munit:execution>
+			<flow-ref name="workday-bu-sf-sync" />
+		</munit:execution>
+
+
+		<munit:validation>
+
+			<munit-tools:assert-that
+				expression="#[payload]" is="#[MunitTools::notNullValue()]" />
+
+
+			<munit-tools:verify-call processor="flow-ref"
+				times="1">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						attributeName="name" whereValue="bu-validation-subflow" />
+				</munit-tools:with-attributes>
+			</munit-tools:verify-call>
+
+
+			<munit-tools:verify-call processor="flow-ref"
+				times="1">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						attributeName="name"
+						whereValue="baird-workday-integration-upsert-bu-accounts-Flow" />
+				</munit-tools:with-attributes>
+			</munit-tools:verify-call>
+
+		</munit:validation>
+
+	</munit:test>
+
+	<munit:test name="fetch-business-unit-subflow-test">
+
+		<munit:behavior>
+
+			<!-- Mock token request -->
+			<munit-tools:mock-when processor="http:request">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						attributeName="doc:name" whereValue="Request to fetch Token" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value='#[{
+                  "access_token": "TEST_ACCESS_TOKEN",
+                  "token_type": "Bearer",
+                  "expires_in": 3600
+                }]' />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+
+			<munit-tools:mock-when processor="http:request">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						attributeName="doc:name" whereValue="fetch-businessUnits" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value='#[[
+                  {
+                    "Descriptor": { "Id": "BU001", "Name": "Finance" },
+                    "Level": "L1"
+                  },
+                  {
+                    "Descriptor": { "Id": "BU002", "Name": "IT" },
+                    "Level": "L2"
+                  }
+                ]]' />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+
+			<munit:set-event>
+				<munit:variables>
+					<munit:variable key="correlationId"
+						value="TEST-CORR-ID" />
+				</munit:variables>
+			</munit:set-event>
+
+		</munit:behavior>
+
+		<munit:execution>
+			<flow-ref name="fetch-business-unit-subflow" />
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-that
+				expression="#[payload]" is="#[MunitTools::notNullValue()]" />
+		</munit:validation>
+
+	</munit:test>
+	<munit:test name="mark-accounts-inactive-subflow-test"
+		description="Test marking invalid BU Accounts as inactive">
+
+		<munit:behavior>
+			<munit-tools:mock-when
+				processor="salesforce:query">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						attributeName="doc:id"
+						whereValue="5901a810-7c6a-4189-92cd-c5cb2a40b784" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:variables>
+						<munit-tools:variable key="sfResponse"
+							value='#[[
+                  {"Id": "001AAA", "Baird_BU_ID__c": "BU001"},
+                  {"Id": "001BBB", "Baird_BU_ID__c": "BU002"},
+                  {"Id": "001CCC", "Baird_BU_ID__c": "BU999"}
+                ]]' />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when
+				processor="salesforce:update">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						attributeName="doc:id"
+						whereValue="863a0f8e-2343-4883-a254-713607cb180a" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+
+			<munit:set-event>
+				<munit:payload
+					value='#[[ {"Id": "BU001"}, {"Id": "BU002"} ]]' />
+				<munit:variables>
+					<munit:variable key="correlationId"
+						value="TEST-CORR-ID" />
+					<munit:variable key="counter" value="1" />
+				</munit:variables>
+			</munit:set-event>
+		</munit:behavior>
+
+		<munit:execution>
+			<flow-ref name="mark-accounts-inactive-subflow" />
+		</munit:execution>
+
+		<munit:validation>
+
+
+			<munit-tools:assert-that
+				expression="#[vars.upsertRequest]"
+				is="#[MunitTools::notNullValue()]" />
+
+
+			<munit-tools:assert-that
+				expression="#[sizeOf(vars.upsertRequest)]"
+				is="#[MunitTools::equalTo(1)]" />
+
+			<munit-tools:assert-that
+				expression="#[vars.upsertRequest[0].Id]"
+				is="#[MunitTools::equalTo('001CCC')]" />
+
+			<munit-tools:assert-that
+				expression="#[vars.upsertRequest[0].Active__c]"
+				is="#[MunitTools::equalTo(false)]" />
+
+		</munit:validation>
+
+	</munit:test>
+	<munit:test
+		name="send-duplicate-BU-enteries-nofitication-test"
+		description="Test sending email notification for duplicate BU entries">
+
+		<munit:behavior>
+			<munit-tools:mock-when
+				processor="mule:flow-ref" doc:name="Mock Send Mail API">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="send-mail-graph-sys-api" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+
+			<munit:set-event doc:name="Set Duplicate Data">
+				<munit:variables>
+					<munit:variable key="correlationId"
+						value="TEST-CORR-123" />
+					<munit:variable key="duplicateBusinessUnits"
+						value='#[[
+                    {
+                        "Descriptor": { "Id": "BU001", "Name": "Finance" },
+                        "Level": 1
+                    },
+                    {
+                        "Descriptor": { "Id": "BU002", "Name": "Technology" },
+                        "Level": 2
+                    }
+                ]]' />
+				</munit:variables>
+			</munit:set-event>
+		</munit:behavior>
+
+		<munit:execution>
+			<flow-ref name="send-duplicate-BU-enteries-nofitication" />
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-that
+				expression="#[payload.attachments[0].filename]"
+				is="#[MunitTools::equalTo('BusinessUnitDuplicates_Report.csv')]"
+				doc:name="Verify Filename" />
+
+			<munit-tools:assert-that
+				expression="#[payload.attachments[0].contentType]"
+				is="#[MunitTools::equalTo('plain/text')]"
+				doc:name="Verify Content Type" />
+
+			<munit-tools:assert-that
+				expression="#[payload.attachments[0].content]"
+				is="#[MunitTools::notNullValue()]"
+				doc:name="Verify Attachment Content Exists" />
+
+			<munit-tools:verify-call
+				processor="mule:flow-ref" times="1">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="send-mail-graph-sys-api" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:verify-call>
+		</munit:validation>
+	</munit:test>
+	<munit:test name="bu-validation-subflow-test-success"
+		description="Test BU validation logic with duplicates and filtering">
+		<munit:behavior>
+			<munit-tools:mock-when
+				processor="mule:flow-ref" doc:name="Mock Fetch BU">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="fetch-business-unit-subflow" attributeName="name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value='#[[
+                    { "Descriptor": { "Id": "BU001", "Name": "Finance" }, "Level": 1 },
+                    { "Descriptor": { "Id": "BU001", "Name": "Finance" }, "Level": 1 },
+                    { "Descriptor": { "Id": "BU002", "Name": "Tech" }, "Level": 2, "Level1Descriptor": {"Id": "BU001", "Name": "Finance"} }
+                ]]' />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when
+				processor="mule:flow-ref" doc:name="Mock Notification">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="send-duplicate-BU-enteries-nofitication"
+						attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when
+				processor="mule:flow-ref" doc:name="Mock Mark Inactive">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="mark-accounts-inactive-subflow" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+
+			<munit:set-event doc:name="Set CorrelationId">
+				<munit:variables>
+					<munit:variable key="correlationId"
+						value="TEST-VALIDATION-ID" />
+				</munit:variables>
+			</munit:set-event>
+		</munit:behavior>
+
+		<munit:execution>
+			<flow-ref name="bu-validation-subflow" />
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-that
+				expression="#[sizeOf(vars.duplicateBusinessUnits)]"
+				is="#[MunitTools::equalTo(1)]" doc:name="Assert 1 Duplicate Found" />
+
+			<munit-tools:assert-that
+				expression="#[sizeOf(vars.filteredBusinessUnits)]"
+				is="#[MunitTools::equalTo(2)]" doc:name="Assert 2 Unique BUs" />
+
+			<munit-tools:verify-call
+				processor="mule:flow-ref" times="1">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="send-duplicate-BU-enteries-nofitication"
+						attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:verify-call>
+
+			<munit-tools:assert-that
+				expression="#[payload[0].Level1Descriptor[0].Id]"
+				is="#[MunitTools::equalTo('BU001')]"
+				doc:name="Verify SF Payload Content" />
+		</munit:validation>
+	</munit:test>
+</mule>
