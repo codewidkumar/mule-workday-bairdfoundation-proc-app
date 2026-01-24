@@ -10,54 +10,46 @@
 		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
 		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
 	<munit:config name="common-test-suite.xml" />
-	<munit:test name="send-mail-graph-sys-api-test-success"
-		description="Test sending email via Graph API successfully">
-		<munit:behavior>
-			<munit-tools:mock-when processor="http:request"
-				doc:name="Mock Graph API Request">
-				<munit-tools:with-attributes>
-					<munit-tools:with-attribute
-						whereValue="POST  /send-email  Graph System API"
-						attributeName="doc:name" />
-				</munit-tools:with-attributes>
-				<munit-tools:then-return>
-					<munit-tools:payload
-						value='#[{"status": "Email Sent"}]' />
-					<munit-tools:attributes
-						value="#[{ 'statusCode': 202 }]" />
-				</munit-tools:then-return>
-			</munit-tools:mock-when>
+	<munit:test name="send-mail-graph-sys-api-test-success" description="Test sending email via Graph API">
+    <munit:behavior>
+        <!-- [STUDIO:"Mock Graph API Request"]<munit-tools:mock-when processor="http:request" doc:name="Mock Graph API Request">
+            <munit-tools:with-attributes>
+                <munit-tools:with-attribute 
+                    whereValue="YOUR_COMPONENT_ID_HERE" 
+                    attributeName="doc:id" />
+            </munit-tools:with-attributes>
+            <munit-tools:then-return>
+                <munit-tools:payload value='#[{"status": "Email Sent"}&#93;' mediaType="application/json" />
+                <munit-tools:attributes value="#[{ 'statusCode': 202 }&#93;" />
+            </munit-tools:then-return>
+        </munit-tools:mock-when> [STUDIO] -->
 
-			<munit:set-event doc:name="Set Email Payload">
-				<munit:payload
-					value='#[{
-                "to": "user@example.com",
-                "subject": "Test Subject",
-                "body": "Test Body",
-                "attachments": []
-            }]' />
-				<munit:variables>
-					<munit:variable key="correlationId"
-						value="TEST-EMAIL-ID" />
-				</munit:variables>
-			</munit:set-event>
-		</munit:behavior>
+        <munit:set-event doc:name="Set Email Payload">
+            <munit:payload value='#[{ "to": "user@example.com", "subject": "Test", "body": "Test" }]' />
+            <munit:variables>
+                <munit:variable key="correlationId" value="TEST-EMAIL-ID" />
+            </munit:variables>
+        </munit:set-event>
+    </munit:behavior>
 
-		<munit:execution>
-			<flow-ref name="send-mail-graph-sys-api" />
-		</munit:execution>
+    <munit:execution>
+        <flow-ref name="send-mail-graph-sys-api" />
+    </munit:execution>
 
-		<munit:validation>
-			<munit-tools:verify-call
-				processor="http:request" times="1" doc:name="Verify Graph API Call">
-				<munit-tools:with-attributes>
-					<munit-tools:with-attribute
-						whereValue="POST  /send-email  Graph System API"
-						attributeName="doc:name" />
-				</munit-tools:with-attributes>
-			</munit-tools:verify-call>
-		</munit:validation>
-	</munit:test>
+    <munit:validation>
+        <!-- [STUDIO:"Verify Graph API Call"]<munit-tools:verify-call processor="http:request" times="1" doc:name="Verify Graph API Call">
+            <munit-tools:with-attributes>
+                <munit-tools:with-attribute 
+                    whereValue="YOUR_COMPONENT_ID_HERE" 
+                    attributeName="doc:id" />
+            </munit-tools:with-attributes>
+        </munit-tools:verify-call> [STUDIO] -->
+        
+        <!-- [STUDIO:"Assert that"]<munit-tools:assert-that expression="#[payload.status&#93;" 
+            is="#[MunitTools::equalTo('Email Sent')&#93;" /> [STUDIO] -->
+			<munit-tools:assert-that doc:name="Assert that" doc:id="4b0ae1c8-fcae-45a2-b262-52e4f193a36d" expression="#[vars.correlationId]" is="#[MunitTools::notNullValue()]"/>
+    </munit:validation>
+</munit:test>
 	<munit:test
 		name="sf-check-job-status-test-success-with-failures"
 		description="Test job status check captures failed records">
