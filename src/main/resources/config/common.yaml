@@ -65,9 +65,7 @@ officerType:
 sfProfileName:
   bairdSystemAdministrator: "Baird System Administrator"
   bairdFoundationStandardUser: "Baird Foundation Standard User"
-  #bairdAssociate: "Default Minimum Customer Community Plus Login" #"Baird Associate"
-  communityPlusLogin: "Default Minimum Customer Community Plus Login" #"Community Plus Login"
-  #chatterFreeUser: "Chatter Free User"
+  communityPlusLogin: "Default Minimum Customer Community Plus Login"
  
 #Salesforce User Roles 
 sfUserRole:
@@ -77,6 +75,5 @@ sfUserRole:
   
 #SalesforceDeveloperName
 sfDeveloperName:
-  #associate: "Associate"
   foundationStaff: "Foundation_Staff"
   systemAdministrator: "SystemAdministrator"
