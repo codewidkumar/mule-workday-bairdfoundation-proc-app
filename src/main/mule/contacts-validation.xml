@@ -80,7 +80,12 @@ output application/json
 		<salesforce:query doc:name="Fetch RecordTypeID from RecordType" doc:id="b27b29e6-7411-42b7-82a2-72bbeafac3aa" config-ref="Salesforce_Config" target="recordTypeId">
 			<salesforce:salesforce-query ><![CDATA[#[vars.queries.recordTypeQuery]]]></salesforce:salesforce-query>
 		</salesforce:query>
+		<!-- [STUDIO:"emp-sf-id-mapping-subflow"]<flow-ref doc:name="emp-sf-id-mapping-subflow" doc:id="379cc0d4-f32d-4db0-bb3e-b9d40fa0b08e" name="emp-sf-id-mapping-subflow"/> [STUDIO] -->
 		<flow-ref doc:name="baird-sf-id-mapping-subflow" doc:id="eff637c2-aea4-4ff9-b87a-3e997df90054" name="baird-sf-id-mapping-subflow"/>
+		<!-- [STUDIO:"Query All User EmployeesData"]<salesforce:query doc:name="Query All User EmployeesData" doc:id="46806826-c894-483c-886d-11952d4bfe68" config-ref="Salesforce_Config" target="userEmployeeNumbers" targetValue="#[output application/json&#10;&#45;&#45;-&#10;payload&#93;">
+			<ee:repeatable-file-store-iterable inMemoryObjects="5000" />
+			<salesforce:salesforce-query><![CDATA[Select Id, EmployeeNumber,ProfileId,UserRoleId,IsActive from User where EmployeeNumber != null&#93;&#93;></salesforce:salesforce-query>
+		</salesforce:query> [STUDIO] -->
 		<ee:transform doc:name="Contact Upsert SF Payload" doc:id="9ceb7be6-488b-4795-a54d-b20841e89e66">
 			<ee:message>
 				<ee:set-payload><![CDATA[%dw 2.0
@@ -153,12 +158,53 @@ fun getPhone(data) = do{
 	"AccountId": accountMappedIds[item.BusinessUnitOrganization.Descriptor.Id][0] default null,
 	"Termination_Date__c": item.EmploymentDetail.TerminationDate default "#N/A"
 }
-))]]></ee:set-payload>
+)) //filter $.User__c != null]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
+		<!-- [STUDIO:"userref"]<ee:transform doc:name="userref" doc:id="317cf47d-6e3f-4cf4-9a1c-81f7727a8858" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="userref" ><![CDATA[%dw 2.0
+output application/json
+&#45;&#45;-
+payload map ((item,index)->{"id":item.User__c})&#93;&#93;></ee:set-variable>
+			</ee:variables>
+		</ee:transform> [STUDIO] -->
 		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="22d37d9d-2bf1-4b41-b16a-e46d5e20e307" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Ending contact validation flow&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]"/>
 	
 </sub-flow>
+	<!-- [STUDIO:"emp-sf-id-mapping-subflow"]<sub-flow name="emp-sf-id-mapping-subflow" doc:id="f4698d3e-c0b5-4631-91c9-fc87fd67d516" >
+		<foreach doc:name="FOR EACH in empIds " doc:id="2507378b-d6e9-4150-b96c-50eec0c7cc3d" collection="#[vars.empIds&#93;" batchSize="${batch.empContacts}" >
+			<ee:transform doc:name="Select Query User" doc:id="7b3db90e-5373-4f86-a48b-d6afa99b8926" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+&#45;&#45;-
+"SELECT EmployeeNumber,Id FROM User Where EmployeeNumber IN ('" ++ (payload joinBy "','") ++ "')"&#93;&#93;></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<logger level="DEBUG" doc:name="DEBUG: Log Outbound" doc:id="f68991c4-07fd-434e-a13f-acbfc01d5abb" message="#[%dw 2.0&#10;output application/json&#10;&#45;&#45;-&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Before fetching EmployeeNumber and Id from User Object&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;,&#10;	&quot;BatchNo&quot;: vars.counter default null,&#10;	&quot;BatchSize&quot;: p('batch.empContacts') default null,&#10;	&quot;Query&quot;: payload default null&#10;}&#93;" category="contacts.sync"/>
+			<salesforce:query doc:name="Fetch EmpId And SF Ids" doc:id="c966c95a-1c84-4a78-a2dc-1ba21aa77c93" config-ref="Salesforce_Config" >
+				<salesforce:salesforce-query ><![CDATA[#[payload&#93;&#93;&#93;></salesforce:salesforce-query>
+			</salesforce:query>
+			<logger level="DEBUG" doc:name="DEBUG: Log Inbound" doc:id="45f2b6ef-163e-4e7c-9fd1-eb5009d240d2" message="#[%dw 2.0&#10;output application/json&#10;&#45;&#45;-&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;After fetching EmployeeNumber and Id from User Object&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;,&#10;	&quot;BatchNo&quot;: vars.counter default null,&#10;	&quot;BatchSize&quot;: p('batch.empContacts') default null,&#10;	&quot;SFResponse&quot;: (payload filter ((item, index) -&gt; item.Employee_ID__c != null)) map ((item, index) -&gt;&#10;{&#10;		&quot;EmpId&quot;: item.Employee_ID__c,&#10;		&quot;Id&quot;: item.Id&#10;	})&#10;}&#93;" category="contacts.sync"/>
+			<ee:transform doc:name="Accumulate EmpData for further operations" doc:id="c7bf248b-0014-412b-83f4-14b12d25b4d0" >
+				<ee:message />
+				<ee:variables >
+					<ee:set-variable variableName="empsContactDetails" ><![CDATA[%dw 2.0
+output application/json
+&#45;&#45;-
+vars.empsContactDetails ++ ((payload filter ((item, index) -> item.EmployeeNumber != null) ) map ((item, index) ->
+{
+    "EmpId" : item.EmployeeNumber,
+    "Id" : item.Id
+}
+))&#93;&#93;></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+	</sub-flow> [STUDIO] -->
 
 	<sub-flow name="baird-sf-id-mapping-subflow" doc:id="21b75c90-c77b-4470-a397-6bd11b8e0ab4" >
 		<foreach doc:name="FOR EACH in bairdIds" doc:id="089e8405-b4e7-44b4-86bc-d647b5a86430" collection="#[vars.bairdIds]" batchSize="${batch.empContacts}" >
@@ -249,7 +295,7 @@ error]]></ee:set-variable>
 		<logger level="INFO" doc:name="INFO: Log Info" doc:id="db18f6b7-339c-4820-9dff-2cad5de10f39" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SF Users Data&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
 		<salesforce:query doc:name="Query All User EmployeesData" doc:id="d5707859-9ba8-4e2e-a1d0-f99de2bf86a6" config-ref="Salesforce_Config" target="userEmployeeNumbers" targetValue="#[output application/json&#10;---&#10;payload]" >
 			<ee:repeatable-file-store-iterable inMemoryObjects="5000" />
-			<salesforce:salesforce-query ><![CDATA[Select Id, EmployeeNumber,ProfileId,UserRoleId,IsActive from User where EmployeeNumber != null]]></salesforce:salesforce-query>
+			<salesforce:salesforce-query ><![CDATA[Select Id,EmployeeNumber,ProfileId,UserRoleId,IsActive,Eligible_for_Match__c from User where EmployeeNumber != null]]></salesforce:salesforce-query>
 		</salesforce:query>
 		<flow-ref doc:name="Flow Reference to workers-validation-flow" doc:id="c662e1e1-db40-4a44-b8f6-a295191efaf6" name="workers-validation-subflow" />
 		<try doc:name="Try" doc:id="c699ac8a-f2cd-429b-8f3b-2c8be33074ef" >
@@ -318,6 +364,25 @@ error]]></ee:set-variable>
 				</on-error-propagate>
 			</error-handler>
 		</try>
+		<!-- [STUDIO:"Calculate License"]<ee:transform doc:name="Calculate License" doc:id="157649aa-b05f-4060-80d1-d2cca5e9829f" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="licenseType" ><![CDATA[
+%dw 2.0
+output application/json
+fun licenseType(item) =
+  if ( (item.EmployeeIndicator == "Y") and
+    (((item.Location.CountryCode == "USA") and (item.EmploymentDetail.EmployeeTypeCode == "R")) or
+      ((["GBR", "DEU"&#93; contains item.Location.CountryCode) and (["R", "T", "L", "I"&#93; contains item.EmploymentDetail.EmployeeTypeCode))) and
+    !((vars.salesforceBFSystemAdministrator contains item.EmpId) and (vars.salesforceBFStandardUserAdministrator contains item.EmpId)) ) "EligibleForMatch"
+  else null
+&#45;&#45;-
+vars.validWorkers map ((item, index) -> {
+	(item.EmpId): licenseType(item)
+})
+&#93;&#93;></ee:set-variable>
+			</ee:variables>
+		</ee:transform> [STUDIO] -->
 	</sub-flow>
 	<sub-flow name="workers-validation-subflow" doc:id="4060620b-8513-4024-bc28-fa7eff3d20e6" >
 		<ee:transform doc:name="Partition Valid and Invalid Workers" doc:id="3a0547de-4dcf-4b93-998e-6ab10604cafc" >

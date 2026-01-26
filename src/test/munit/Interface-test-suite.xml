@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+	xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="Interface-test-suite.xml" />
+	<munit:test name="baird-workday-sf-sync-prc-apiFlow-test" description="Verify all subflows are called when state is Stopped">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="Mock Retrieve Sync State" processor="os:retrieve">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Retrieve Previous Sync State" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="syncState" value='#["Stopped"]' />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when doc:name="Mock Store Sync State" processor="os:store">
+				<munit-tools:then-return />
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when doc:name="Mock workday-bu-sf-sync" processor="mule:flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="workday-bu-sf-sync" attributeName="name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return />
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when doc:name="Mock workday-contacts-sf-sync" processor="mule:flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="workday-contacts-sf-sync" attributeName="name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return />
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when doc:name="Mock workday-workers-sf-sync" processor="mule:flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="workday-workers-sf-sync" attributeName="name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return />
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when doc:name="Mock upsert-user-contact-subflow" processor="mule:flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="upsert-user-contact-subflow" attributeName="name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return />
+			</munit-tools:mock-when>
+		</munit:behavior>
+
+		<munit:execution >
+			<flow-ref doc:name="Flow-ref" name="baird-workday-sf-sync-prc-apiFlow" />
+		</munit:execution>
+
+		<munit:validation >
+			<munit-tools:verify-call doc:name="Verify BU Sync" processor="mule:flow-ref" times="1">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute whereValue="workday-bu-sf-sync" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:verify-call>
+			
+			<munit-tools:verify-call doc:name="Verify Final Store (Stopped)" processor="os:store" times="2">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute whereValue="Object_store_syncStatus" attributeName="objectStore" />
+				</munit-tools:with-attributes>
+			</munit-tools:verify-call>
+		</munit:validation>
+	</munit:test>
+</mule>

@@ -6,6 +6,9 @@
 http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
 http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="47603b0b-2b8b-4ca6-b385-a32181496cb8" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
 	<sub-flow name="upsert-user-contact-subflow" doc:id="2c176368-7485-4180-9f1a-ef4cd906a655" >
 		<flow-ref doc:name="Flow Reference to user-manager-update-subflow" doc:id="c0f17dd5-f881-4f25-8889-34c676b7398e" name="user-manager-update-subflow"/>
 	</sub-flow>
@@ -32,7 +35,7 @@ vars.validWorkers map ((item,index)->{
 		if ( (userData != null) ) (userData.Id)
                 else "#N/A"
 	},
-	"Id": (vars.userSFEmployeeNumbers filter($.EmployeeNumber == item.EmpId))[0].Id default ""
+	"Id": (vars.contactDetails filter($.Employee_ID__c == item.EmpId))[0].Id default ""
 })]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>

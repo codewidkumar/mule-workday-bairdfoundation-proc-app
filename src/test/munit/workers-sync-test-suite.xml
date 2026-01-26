@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+	xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="workers-sync-test-suite.xml" />
+	<munit:test name="workers-validation-subflow-test-suite"
+		doc:id="773bc7a8-908f-472b-a551-1ec209500dd7"
+		description="Test logic for partitioning workers">
+		<munit:execution>
+			<munit:set-event doc:name="Set Input Data"
+				doc:id="dcb0bcf1-6d05-4d9f-80da-94f6535b352e">
+				<munit:payload
+					value='#[%dw 2.0
+    output application/json
+    ---
+    [
+      {
+        "EmpId": "E1001",
+        "FirstName": "Alice",
+        "LastName": "Smith",
+        "UserName": "asmith",
+        "Emails": [
+          { "EmailAddressTypeCode": "BRDEMAIL", "EmailAddress": "alice@company.com" }
+        ],
+        "EmploymentDetail": {
+          "HireDate": "2020-01-01",
+          "Active": true
+        }
+      },
+      {
+        "EmpId": "E9999",
+        "FirstName": "Invalid",
+        "LastName": "User",
+        "UserName": "iuser",
+        "Emails": [],
+        "EmploymentDetail": {
+          "HireDate": "2020-01-01",
+          "Active": true
+        }
+      }
+    ]
+  ]'
+					mediaType="application/json" />
+				<munit:variables>
+					<munit:variable key="userEmployeeNumbers"
+						value='#[ {"EmployeeNumber": ["E1001", "E1002"]} ]'
+						mediaType="application/json" />
+				</munit:variables>
+			</munit:set-event>
+
+			<flow-ref doc:name="Flow-ref to workers-validation-subflow"
+				name="workers-validation-subflow" />
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-that
+				doc:name="Assert 1 Valid Worker"
+				expression="#[sizeOf(vars.validWorkers)]"
+				is="#[MunitTools::equalTo(1)]"
+				message="Expected 1 valid worker (Alice)" />
+
+			<munit-tools:assert-that
+				doc:name="Assert 1 Invalid Worker"
+				expression="#[sizeOf(vars.invalidWorkers)]"
+				is="#[MunitTools::equalTo(1)]"
+				message="Expected 1 invalid worker (Missing Email)" />
+
+			<munit-tools:assert-equals
+				doc:name="Verify Valid Worker ID"
+				actual="#[vars.validWorkers[0].EmpId]" expected='#[ "E1001" ]'
+				message="The valid worker should be E1001" />
+		</munit:validation>
+	</munit:test>
+	<munit:test name="sync-workers-to-sf-subflow-test-suiteTest"
+		doc:id="58ad58d5-f821-45d9-9a19-2085967e9869">
+		<munit:behavior>
+			<munit-tools:mock-when doc:name="Mock when"
+				doc:id="b2463517-8bfe-446e-b390-164f2e4b8caf"
+				processor="salesforce:create-job-bulk-api-v2">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="9bc2ad18-734c-45d3-af04-1492bdd9e22e"
+						attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value='#[%dw 2.0&#10;                    output application/json&#10;                    ---&#10;                    {&#10;                      "id": "750xx000000TEST"&#10;                    }]'
+						mediaType="application/json" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Mock when"
+				doc:id="320aa826-c56c-4515-96f6-192e388dad25" processor="flow-ref">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="3a95bac9-630f-4b71-bd02-b3a4342a48e0"
+						attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload value="#['OK']" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Mock when"
+				doc:id="73388391-56d0-41a6-8801-d7aa57b69c64"
+				processor="salesforce:create-job-bulk-api-v2">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="a00d18f3-f927-4fd8-ae5f-0cc4558f49f1"
+						attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value='#[%dw 2.0&#10;output application/json&#10;---&#10;                    {&#10;                      "id": "750xx000000TEST"&#10;                    }]' />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Mock when"
+				doc:id="ac06e2c2-8073-43fe-9ad2-16c506250338" processor="flow-ref">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="c17f8877-a43e-4365-ab94-00b4c1e2e76a"
+						attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload value="#['OK']" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+			<munit-tools:mock-when doc:name="Mock when"
+				doc:id="6fadd61a-9ae1-441e-bc2f-878fda464323" processor="flow-ref">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="4ad8226c-86f5-43c2-91a0-1a5416326921"
+						attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload value="#['MAIL_SENT']" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+		<munit:execution>
+			<munit:set-event doc:name="Set Event"
+				doc:id="02ebefb8-e9e0-425f-bd44-f44403490ccd">
+				<munit:payload
+					value='#[%dw 2.0&#10;                output application/json&#10;                ---&#10;                [&#10;                  {&#10;                    "Id": "0051",&#10;                    "FirstName": "John",&#10;                    "LastName": "Doe",&#10;                    "Email": "john.doe@test.com"&#10;                  }&#10;                ]]' />
+				<munit:variables>
+					<munit:variable key="failedRecords"
+						value="%dw 2.0 output application/json --- []" />
+					<munit:variable key="jobIds"
+						value=" %dw 2.0 output application/json --- []" />
+					<munit:variable key="downgradeJobIds"
+						value=" %dw 2.0 output application/json --- []" />
+					<munit:variable key="counter" value="1" />
+					<munit:variable key="correlationId"
+						value="TEST-CORR-ID" />
+					<munit:variable key="userRoleIds"
+						value='%dw 2.0 output application/json --- [{ "Id": "R1", "Name": "Associate" },{ "Id": "R2", "Name": "FoundationStaff" },{ "Id": "R3", "Name": "SystemAdministrator" }]' />
+				</munit:variables>
+			</munit:set-event>
+			<set-variable
+				value='#[%dw 2.0&#10;    output application/json&#10;    ---&#10;&#10;[&#10;  {&#10;    "Email": "john.doe@baird.com.invalid",&#10;    "FederationIdentifier": "E1001",&#10;    "EmployeeNumber": "E1001",&#10;    "FirstName": "John",&#10;    "LastName": "Doe",&#10;    "Alias": "E1001",&#10;    "Username": "john.doe@baird.com-bairdfoundation.sbx",&#10;    "ProfileId": "P2",&#10;    "CommunityNickname": "jdoe",&#10;    "IsActive": true,&#10;    "EmailEncodingKey": "ISO-8859-1",&#10;    "TimeZoneSidKey": "America/Chicago",&#10;    "LocaleSidKey": "en_US",&#10;    "LanguageLocaleKey": "en_US",&#10;    "Phone": "312-5551234",&#10;    "Title": "Engineer",&#10;    "CompanyName": "Baird",&#10;    "Department": "IT",&#10;    "Division": "Technology",&#10;    "Street": "123 Main St",&#10;    "City": "Chicago",&#10;    "State": "IL",&#10;    "PostalCode": "60601",&#10;    "Country": "US",&#10;    "GL_Code__c": "GL123",&#10;    "Integration_BU_Name__c": "Technology",&#10;    "Integration_Department_Name__c": "IT",&#10;    "Integration_Level_2_Name__c": "#N/A",&#10;    "Integration_Level_3_Name__c": "#N/A",&#10;    "UserRoleId": null,&#10;    "Id": null&#10;  }&#10;]]'
+				doc:name="Set Variable"
+				doc:id="b4335c94-9267-46ee-8da6-a7f80a2e8112"
+				variableName="licenseDowngradePayload" />
+			<flow-ref doc:name="Flow Reference"
+				doc:id="b1d35d91-3c78-4fa7-b4f3-0f2a71c6844c"
+				name="sync-workers-to-sf-subflow" />
+		</munit:execution>
+		<munit:validation>
+			<munit-tools:assert-that
+				doc:name="Assert that" doc:id="df8f08e5-8a7d-4153-a784-4a7f54974fd6"
+				expression="#[true]" is="#[MunitTools::equalTo(true)]" />
+		</munit:validation>
+	</munit:test>
+	<munit:test name="workday-workers-sf-sync-test-case" description="Test worker sync orchestration and license logic">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="Mock IsActive Update" processor="salesforce:update">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Update IsActive to false" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value="#[[]]" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when doc:name="Mock Query Contact" processor="salesforce:query">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Query Contact" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value="#[[{Id: '003Contact001', Employee_ID__c: 'EMP123'}]]" mediaType="application/java" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when doc:name="Mock Query Profile Ids" processor="salesforce:query">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Query Profile Ids" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value="#[[
+						{Name: 'Baird System Administrator', Id: 'P_ADMIN_ID'},
+						{Name: 'Baird Foundation Standard User', Id: 'P_STD_ID'},
+						{Name: 'Community Plus Login', Id: 'P_COMM_ID'}
+					]]" mediaType="application/java" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when doc:name="Mock Query BU Ids" processor="salesforce:query">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Query BU Ids" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value="#[[{Baird_BU_ID__c: 'BU_999'}]]" mediaType="application/java" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when doc:name="Mock Query UserRole Ids" processor="salesforce:query">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="Query UserRole Ids" attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:payload value="#[[{Name: 'Foundation Staff', Id: 'R_STAFF_ID'}]]" mediaType="application/java" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when doc:name="Mock Sync Workers Subflow" processor="mule:flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="sync-workers-to-sf-subflow" attributeName="name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return />
+			</munit-tools:mock-when>
+		</munit:behavior>
+
+		<munit:execution >
+			<munit:set-event doc:name="Set Input Variables">
+				<munit:variables >
+					<munit:variable key="correlationId" value="MUNIT-TEST-123" />
+					<munit:variable key="invalidWorkers" value="#[[]]" />
+					<munit:variable key="salesforceBFSystemAdministrator" value="#[['ADMIN001']]" />
+					<munit:variable key="salesforceBFStandardUserAdministrator" value="#[[]]" />
+					<munit:variable key="userEmployeeNumbers" value="#[[{EmployeeNumber: 'EMP123', Id: '005User001', IsActive: true, ProfileId: 'P_COMM_ID'}]]" />
+					<munit:variable key="validWorkers" value="#[[{
+						EmpId: 'EMP123',
+						UserName: 'testuser',
+						FirstName: 'MUnit',
+						LastName: 'Test',
+						EmployeeIndicator: 'Y',
+						Emails: [{EmailAddressTypeCode: 'BRDEMAIL', EmailAddress: 'munit@baird.com'}],
+						Phones: [{TelecommunicationsNumberTypeCode: 'WORK', Type: 'Landline', AreaCode: '414', ContactNumber: '5551212'}],
+						Location: {CountryCode: 'USA', Address1: '123 Test St', CityName: 'Milwaukee', StateAbbreviation: 'WI', PostalCode: '53202'},
+						EmploymentDetail: {Active: true, EmployeeTypeCode: 'R'},
+						Department: {Name: 'Engineering', GlCode: 'GL-001'},
+						BusinessUnitOrganization: {Descriptor: {Id: 'BU_999', Name: 'Baird BU'}, Level: 1}
+					}]]" />
+				</munit:variables>
+			</munit:set-event>
+			<flow-ref doc:name="Flow-ref" name="workday-workers-sf-sync" />
+		</munit:execution>
+
+		<munit:validation >
+			<munit-tools:assert-that doc:name="Verify Workers Payload Created" 
+				expression="#[vars.workerspayload]" is="#[MunitTools::notNullValue()]" />
+			<munit-tools:assert-that doc:name="Verify Profile Resolved" 
+				expression="#[vars.workerspayload[0].ProfileId]" is="#[MunitTools::notNullValue()]" />
+		</munit:validation>
+	</munit:test>
+
+
+</mule>
