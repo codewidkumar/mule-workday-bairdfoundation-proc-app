@@ -67,9 +67,9 @@
 				</munit-tools:with-attributes>
 			</munit-tools:verify-call>
 			
-			<munit-tools:verify-call doc:name="Verify Final Store (Stopped)" processor="os:store" times="2">
-				<munit-tools:with-attributes>
-					<munit-tools:with-attribute whereValue="Object_store_syncStatus" attributeName="objectStore" />
+			<munit-tools:verify-call doc:name="Verify Final Store (Stopped)" processor="os:store" times="1">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="b69d821f-4657-4081-bee0-a0cc56acef51" attributeName="doc:id" />
 				</munit-tools:with-attributes>
 			</munit-tools:verify-call>
 		</munit:validation>
