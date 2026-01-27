@@ -8,12 +8,12 @@ http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mu
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
 	<flow name="baird-workday-sf-sync-prc-apiFlow" doc:id="11f9f00d-a4f3-4c2c-9583-e6b3a0eb4f9a" >
-		<!-- [STUDIO:"Workday Salesforce Daily Sync"]<scheduler doc:name="Workday Salesforce Daily Sync" doc:id="3d0369dc-65fb-4d09-bc71-13e81734a069" >
+		<scheduler doc:name="Workday Salesforce Daily Sync" doc:id="3d0369dc-65fb-4d09-bc71-13e81734a069" >
 			<scheduling-strategy >
 				<cron expression="${workdaySalesforce.cron}" />
 			</scheduling-strategy>
-		</scheduler> [STUDIO] -->
-		<http:listener doc:name="Listener" doc:id="23f77c91-9088-48ee-aea9-137cedbb96bb" config-ref="HTTP_Listener_config" path="/workdaymain"/>
+		</scheduler>
+		<!-- [STUDIO:"Listener"]<http:listener doc:name="Listener" doc:id="23f77c91-9088-48ee-aea9-137cedbb96bb" config-ref="HTTP_Listener_config" path="/workdaymain"/> [STUDIO] -->
 		<set-variable value="#[now() as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss&quot;}]" doc:name="Set correlationId" doc:id="32f5acb4-136b-4a77-82a1-d286b9fd4786" variableName="correlationId"/>
 		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="cb4e7c2b-3b80-4677-abf0-d7f7bc8b2f67" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Starting Workday to Salesforce sync&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now()&#10;}]"/>
 		<os:retrieve doc:name="Retrieve Previous Sync State" doc:id="aa7c0efa-acb0-4a8b-81f0-89204ffe9930" key='#["syncState"]' target="syncState" objectStore="Object_store_syncStatus">
@@ -28,7 +28,7 @@ http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/cu
 				<flow-ref doc:name="flow-reference to workday-bu-sf-sync" doc:id="1f7e95d6-58cd-47cb-a343-7716e2a5eba6" name="workday-bu-sf-sync" />
 				<flow-ref doc:name="flow-reference to workday-contacts-sf-sync" doc:id="1130ea65-9d66-44c5-9540-4e04ff6270e9" name="workday-contacts-sf-sync" />
 				<flow-ref doc:name="flow-reference to workday-workers-sf-sync" doc:id="e2b71afe-2249-4672-9fb5-af672d86e775" name="workday-workers-sf-sync" />
-				<flow-ref doc:name="flow-reference to user-contact-sf-sync" doc:id="3db16348-3cb2-4d8d-8704-ffe9f357df91" name="upsert-user-contact-subflow"/>
+				<flow-ref doc:name="flow-reference to upsert-user-contact" doc:id="3db16348-3cb2-4d8d-8704-ffe9f357df91" name="upsert-user-contact"/>
 				<os:store doc:name="Set Current Sync State" doc:id="b69d821f-4657-4081-bee0-a0cc56acef51" key="syncState" objectStore="Object_store_syncStatus">
 			<os:value><![CDATA[#["Stopped"]]]></os:value>
 		</os:store>

@@ -50,7 +50,7 @@ var invalidWorkers = (vars.invalidWorkers filter($.EmploymentDetail.HireDate <= 
 					<flow-ref doc:name="Flow Reference to mail-invalid-workers" doc:id="fec1f65a-e40f-4c5a-a7dd-f5535bcad55b" name="send-mail-graph-sys-api" />
 				</when>
 			</choice>
-		</async>
+		</async>		
 		<ee:transform doc:name="Set Payload For Updating isActive" doc:id="2248fa06-34e7-4f67-a3f7-0b9b85339333">
 			<ee:message>
 				<ee:set-payload><![CDATA[%dw 2.0

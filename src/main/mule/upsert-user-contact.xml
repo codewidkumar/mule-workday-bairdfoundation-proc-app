@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="47603b0b-2b8b-4ca6-b385-a32181496cb8" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="upsert-user-contact" doc:id="156aa14a-669f-4d6c-a6fd-07a29fa53290" >
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="b0dabfda-9754-477d-8a2a-0891f20376bf" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Before starting user contact upsert sync flow&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now(),&#10;   	&quot;BusinessKey&quot;: &quot;UserContact&quot;&#10;}]" />
+		<flow-ref doc:name="Flow Reference to user-contact-upsert-subflow" doc:id="c513579f-1bf6-4846-a997-f3a8c28fa6b2" name="user-contact-upsert-subflow"/>
+		<logger level="INFO" doc:name="INFO: Log Entry1" doc:id="d2570d74-af5f-43be-8a4e-f3bc93e9e3b8" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;After contacts are updated&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now(),&#10;   	&quot;BusinessKey&quot;: &quot;UserContact&quot;&#10;}]" />
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="6d6e1ee8-1f5c-4421-9e21-6791572a30e6" type="ANY" >
+				<logger level="ERROR" doc:name="ERROR: Log ERROR" doc:id="2a446cd6-6ed1-4f71-988a-3c901ed7ba3b" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description,&#10;	&quot;CorrelationId&quot;: correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;}]" />
+				<ee:transform doc:name="Email payload" doc:id="3c28030a-d783-4b03-8dca-035b9fe8c195" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+output application/json
+var errorDescription = if(vars.errorObject == null) (error.description default "Internal Server Error") else vars.errorObject.description
+---
+{
+	"to": p('email.supportTeam.to'),
+	"subject": p('email.error.subject') ++ vars.correlationId,
+	"body": p('email.error.body') ++ error.description ++ "\nCorrelationId: " ++ vars.correlationId ++ "\nTimeStamp: " ++ now() ++"\n\nRegards,\nMulesoft Application\n",
+	"cc": p('email.supportTeam.cc'),
+	"attachments": []
+}
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Flow Reference to send-mail-graph-sys-api" doc:id="e3072d1d-00b5-4fe2-8d85-833681980ee9" name="send-mail-graph-sys-api" />
+				<os:store doc:name="Set Current Sync State" doc:id="ed3aafd5-5162-4da0-ac14-ac891ba7eadc" key="syncState" objectStore="Object_store_syncStatus" >
+					<os:value ><![CDATA[#["Stopped"]]]></os:value>
+				</os:store>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<sub-flow name="user-contact-upsert-subflow" doc:id="c4e027fa-bc73-4b4a-84a6-849544219a30" >
+		<salesforce:query doc:name="Query User" doc:id="186fde71-fb5c-475f-8ec9-e72576a91e0f" config-ref="Salesforce_Config" target="userSFEmployeeNumbers">
+			<salesforce:salesforce-query><![CDATA[SELECT Id, IsActive, EmployeeNumber,ProfileId FROM User where EmployeeNumber != null]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Set Manager &amp; User Mapping" doc:id="55a7627c-29af-48d1-a1e3-c5cf85b1fa61" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var communityPlusLogin = (vars.profileIds filter($.Name == p('sfProfileName.communityPlusLogin'))).Id[0]
+---
+vars.validWorkers map ((item,index)->
+	do {	
+	var userData = (vars.userSFEmployeeNumbers filter($.EmployeeNumber == item.EmpId))[0]
+	---
+	{
+	"Manager__c": do{
+		var userManagerData = (vars.userSFEmployeeNumbers filter($.EmployeeNumber == item.JobPositionDetail.SupervisorEmpId))[0]
+		---
+		if (userManagerData != null and userManagerData.IsActive == "true") userManagerData.Id
+        else "#N/A"
+	},
+	"User__c":		
+		if (userData != null) userData.Id
+          else "#N/A",
+	"OwnerId": 
+    	if (userData != null and userData.IsActive == "true" and communityPlusLogin != null and userData.ProfileId != communityPlusLogin)
+            userData.Id
+        else null,        
+    "Id": (vars.contactDetails filter($.Employee_ID__c == item.EmpId))[0].Id default "",	
+    "Employee_ID__c": item.EmpId
+	}
+})]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<flow-ref doc:name="Flow Reference to upsert-user-contact-to-sf-subflow" doc:id="82f72f33-8e5e-4e77-9b8c-ac7be63adb99" name="upsert-user-contact-to-sf-subflow"/>
+	</sub-flow>
+	<sub-flow name="upsert-user-contact-to-sf-subflow" doc:id="3d822d0b-493a-4e79-ace9-da5cb08a2009" >
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="050f52c3-98f7-46ac-916b-3e35666df527" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Before starting upsert user contact to sf subflow&quot;,&#10;	&quot;Total Records&quot;: sizeOf(payload) default 0,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;UserContact&quot;&#10;}]" />
+		<ee:transform doc:name="Initilizing Variables" doc:id="00ec28e2-654c-4174-a99f-34e4b28edf0f" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="successRecords" ><![CDATA[%dw 2.0
+output application/json
+---
+[]]]></ee:set-variable>
+				<ee:set-variable variableName="failedRecords" ><![CDATA[%dw 2.0
+output application/json
+---
+[]]]></ee:set-variable>
+				<ee:set-variable variableName="jobIds" ><![CDATA[%dw 2.0
+output application/json
+---
+[]]]></ee:set-variable>
+				<ee:set-variable variableName="businessKey" ><![CDATA[%dw 2.0
+output text/plain
+---
+"UserContact"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="99dca0b1-30ef-448b-9f41-d9d21be6418a" collection="#[payload]" batchSize="${contact.batchSize}" >
+			<ee:transform doc:name="Transform Paylod to CSV" doc:id="3f7860ce-ed45-450d-ae6f-8bd8227f810f" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv header=true, separator="|", lineSeparator="\r\n"
+---
+payload]]></ee:set-payload>
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="successRecords" ><![CDATA[%dw 2.0
+output application/json
+---
+[]]]></ee:set-variable>
+					<ee:set-variable variableName="failedRecords" ><![CDATA[%dw 2.0
+output application/json
+---
+[]]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<salesforce:create-job-bulk-api-v2 objectType="Contact" operation="upsert" doc:name="Create job bulk api v" doc:id="439a1e29-8918-4cb4-bbbb-03d5d306ef0f" config-ref="Salesforce_Config" lineEnding="CRLF" columnDelimiter="PIPE" externalIdFieldName="Employee_ID__c" />
+			<set-variable value="#[output application/json&#10;---&#10;vars.jobIds &lt;&lt; payload.id]" doc:name="Set jobIds" doc:id="38fd8c68-2183-4ffa-b7cf-9c17497a2e50" variableName="jobIds" />
+		</foreach>
+		<flow-ref doc:name="Flow Reference to sf-check-job-status" doc:id="0c9471ae-e547-4843-b111-51dbe76a9826" name="sf-check-job-status" />
+		<choice doc:name="Check For Failed Records" doc:id="35c6d638-7c68-46a9-ae37-1826f58aadd3" >
+			<when expression="#[sizeOf(vars.failedRecords) &gt; 0]" >
+				<ee:transform doc:name="Setting Payload For Failed Records" doc:id="55e3b0bb-4501-4309-a39b-bd6a36cb74a7" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+output application/json
+var failedRecords = vars.failedRecords map ((item, index)-> {
+	"Employee_ID__c": item.originalFields.Employee_ID__c default null,
+    "Id": item.originalFields.Id  default null,
+	"User__c": item.originalFields.User__c default null,
+	"Manager__c": item.originalFields.Manager__c default null,
+	"OwnerId": item.originalFields.OwnerId default null,
+	"ErrorDescription": (item.errorMessage replace ( "\<br>") with " ") replace ("\\") with ""
+	})
+---
+{
+	"to": p('email.supportTeam.to'),
+	"subject": p('email.contacts.subject') ++ (vars.correlationId),
+	"body": p('email.contacts.body'),
+	"cc": p('email.supportTeam.cc'),
+	"attachments": [{
+		"filename": "FailedContactRecords.csv",
+		"content": toBase64(write(failedRecords,"application/csv",{"separator" : ","})),
+		"contentType": "plain/text"
+	}]
+}
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Flow Reference to send-mail-graph-sys-api" doc:id="a0281747-bab4-426f-addb-3b797e134795" name="send-mail-graph-sys-api" />
+			</when>
+		</choice>
+		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="9ed6904a-4808-4930-aecc-1e2a8e7b882f" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;upsert user contact to sf subflow end&quot;,&#10;	&quot;Total Failed Records&quot;: sizeOf(vars.failedRecords) default 0, &#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;UserContact&quot;&#10;}]" />
+	</sub-flow>
+</mule>
