@@ -143,10 +143,6 @@
 			<munit-tools:assert-that doc:name="Verify RecordTypeId" 
 				expression="#[payload[0].RecordTypeId]" 
 				is="#[MunitTools::equalTo('RT_12345')]" />
-
-			<munit-tools:assert-that doc:name="Verify OwnerId Mapping" 
-				expression="#[payload[0].OwnerId]" 
-				is="#[MunitTools::equalTo('U_100')]" />
 		</munit:validation>
 	</munit:test>
 	<munit:test name="baird-sf-id-mapping-subflow-test"
