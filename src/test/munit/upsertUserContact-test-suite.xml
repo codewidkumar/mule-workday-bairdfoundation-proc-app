@@ -8,86 +8,54 @@
 		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
 		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
 	<munit:config name="upsertUserContact-test-suite.xml" />
-<!-- [STUDIO:"upsert-user-contact-subflow-test"]<munit:test name="upsert-user-contact-subflow-test" description="Verify that the manager update subflow is called correctly">
+<munit:test name="upsert-user-contact-subflow-test" description="Verify that the manager update subflow is called correctly">
 		<munit:behavior >
-			<munit-tools:mock-when doc:name="Mock Manager Update Subflow" processor="mule:flow-ref">
+			<munit-tools:mock-when doc:name="Create job bulk api v" doc:id="16a06ec6-3377-48d7-84e3-36776c2a5572" processor="salesforce:create-job-bulk-api-v2" >
 				<munit-tools:with-attributes >
-					<munit-tools:with-attribute whereValue="user-manager-update-subflow" attributeName="name" />
+					<munit-tools:with-attribute whereValue="439a1e29-8918-4cb4-bbbb-03d5d306ef0f" attributeName="doc:id" />
 				</munit-tools:with-attributes>
-				<munit-tools:then-return />
+				<munit-tools:then-return >
+					<munit-tools:payload value='#[%dw 2.0&#10;                    output application/json&#10;                    ---&#10;                    {&#10;                      "id": "750xx000000TEST"&#10;                    }]' mediaType="application/json" />
+				</munit-tools:then-return>
 			</munit-tools:mock-when>
-		</munit:behavior>
-
-		<munit:execution >
-			<munit:set-event doc:name="Set Initial Event" >
-				<munit:variables >
-					<munit:variable key="correlationId" value="TEST-ORCH-001" />
-					</munit:variables>
-			</munit:set-event>
-			<flow-ref doc:name="Flow-ref" name="upsert-user-contact-subflow" />
-		</munit:execution>
-
-		<munit:validation >
-			<munit-tools:verify-call doc:name="Verify Call to Manager Update" 
-				processor="mule:flow-ref" times="1">
-				<munit-tools:with-attributes >
-					<munit-tools:with-attribute whereValue="user-manager-update-subflow" attributeName="name" />
-				</munit-tools:with-attributes>
-			</munit-tools:verify-call>
-		</munit:validation>
-	</munit:test> [STUDIO] -->
-	<!-- [STUDIO:"user-manager-update-subflow-success-test"]<munit:test name="user-manager-update-subflow-success-test" description="Verify Manager and User ID mapping logic">
-		<munit:behavior >
-			<munit-tools:mock-when doc:name="Mock Query User" processor="salesforce:query">
+			<munit-tools:mock-when doc:name="Mock Query User" doc:id="bc338923-4d8e-49ef-b4fd-a1c2410b53e7" processor="salesforce:query" >
 				<munit-tools:with-attributes >
 					<munit-tools:with-attribute whereValue="Query User" attributeName="doc:name" />
 				</munit-tools:with-attributes>
 				<munit-tools:then-return >
 					<munit-tools:variables >
-						<munit-tools:variable key="userSFEmployeeNumbers" value="#[[
-							{Id: 'SF_USER_001', EmployeeNumber: 'E123', IsActive: 'true'},
-							{Id: 'SF_MGR_999', EmployeeNumber: 'MGR999', IsActive: 'true'}
-						&#93;&#93;" mediaType="application/java" />
+						<munit-tools:variable key="userSFEmployeeNumbers" value="#[[{Id: '19374', EmployeeNumber: 'E123', IsActive: true, ProfileId: '123'}]]" />
 					</munit-tools:variables>
 				</munit-tools:then-return>
 			</munit-tools:mock-when>
-
-			<munit-tools:mock-when doc:name="Mock Update Contact" processor="salesforce:update">
+			<munit-tools:mock-when doc:name="Mock when" doc:id="9ab1174d-536b-4ad8-9ce7-cc1c11ba7374" processor="flow-ref">
 				<munit-tools:with-attributes >
-					<munit-tools:with-attribute whereValue="Update Contact" attributeName="doc:name" />
+					<munit-tools:with-attribute whereValue="0c9471ae-e547-4843-b111-51dbe76a9826" attributeName="doc:id" />
 				</munit-tools:with-attributes>
 				<munit-tools:then-return >
-					<munit-tools:payload value="#[[{success: true}&#93;&#93;" />
+					<munit-tools:payload value='#["ok"]' />
 				</munit-tools:then-return>
 			</munit-tools:mock-when>
 		</munit:behavior>
 
 		<munit:execution >
-			<munit:set-event doc:name="Set Worker Data">
+			<munit:set-event doc:name="Set Worker Data" doc:id="521bdfb0-5df1-4e86-a087-12ce9364a0a3">
 				<munit:variables >
 					<munit:variable key="correlationId" value="TEST-MGR-UPD" />
-					<munit:variable key="validWorkers" value="#[[{
-						EmpId: 'E123',
-						JobPositionDetail: {
-							SupervisorEmpId: 'MGR999'
-						}
-					}&#93;&#93;" />
+					<munit:variable key="validWorkers" value="#[[{&#10;						EmpId: 'E123',&#10;						JobPositionDetail: {&#10;							SupervisorEmpId: 'MGR999'&#10;						}&#10;					}]]" />
+					<munit:variable key="profileIds" value="#[[{Id:'123', Name: 'Default Minimum Customer Community Plus Login'}]]" />
 				</munit:variables>
 			</munit:set-event>
-			<flow-ref doc:name="Flow-ref" name="user-manager-update-subflow" />
+			<flow-ref doc:name="Flow-ref" name="upsert-user-contact" doc:id="e8f8a578-e476-4e7a-aecf-bd265844af58"/>
 		</munit:execution>
 
 		<munit:validation >
-			<munit-tools:assert-that doc:name="Assert Manager Mapped" 
-				expression="#[payload[0&#93;.Manager__c&#93;" 
-				is="#[MunitTools::equalTo('SF_MGR_999')&#93;" />
-			
-			<munit-tools:assert-that doc:name="Assert User Mapped" 
-				expression="#[payload[0&#93;.User__c&#93;" 
-				is="#[MunitTools::equalTo('SF_USER_001')&#93;" />
-
-			<munit-tools:verify-call doc:name="Verify SF Update Called" 
-				processor="salesforce:update" times="1" />
+			<munit-tools:verify-call doc:name="Verify Call to Manager Update" 
+				processor="logger" times="1">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="d2570d74-af5f-43be-8a4e-f3bc93e9e3b8" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+			</munit-tools:verify-call>
 		</munit:validation>
-	</munit:test> [STUDIO] -->
+	</munit:test>
 </mule>
