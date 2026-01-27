@@ -50,9 +50,8 @@
 
 			<munit-tools:mock-when doc:name="Mock upsert-user-contact-subflow" processor="mule:flow-ref">
 				<munit-tools:with-attributes >
-					<munit-tools:with-attribute whereValue="upsert-user-contact-subflow" attributeName="name" />
+					<munit-tools:with-attribute whereValue="upsert-user-contact" attributeName="name" />
 				</munit-tools:with-attributes>
-				<munit-tools:then-return />
 			</munit-tools:mock-when>
 		</munit:behavior>
 
