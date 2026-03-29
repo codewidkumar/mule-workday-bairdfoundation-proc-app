@@ -1,0 +1,79 @@
+api:
+    name: "baird-wday-sfdc-sync-app"
+
+syncStatus:
+    expirationInterval: "2"
+    entryTTL: "6"
+
+worker:
+    batchSize: "2000"
+    untilSuccessful:
+        maxRetries: "3"
+        interval: "2000"
+    batchJobStatus:
+        retryTime: "60000"
+        retries: "12"
+
+contact:
+    batchSize: "2000"
+
+account:
+    batchSize: "200"
+
+batch:
+    setInactiveQuery: "200"
+    empContacts: "1000"
+
+graphAPI:
+    members:
+        method: "GET"
+        path: "/api/v1/groups/{groupId}/members"
+    email:
+        method: "POST"
+        path: "/api/v1/users/{userId}/send-email"
+        untilSuccessful:
+            maxRetries: "3"
+            interval: "2000"
+    request:
+        maxConnections: "-1"
+        connectionIdleTimeout: "30000"
+        responseTimeout: "30000"
+  
+    
+# Office type field mapping
+officerType:
+    AVP: "AVP"
+    VP: "VP"
+    VP/ACS: "VP/ACS"
+    SVP: "SVP"
+    SVP/ACS: "SVP/ACS"
+    Dir: "DIR"
+    MD: "MD"
+    MD/CFO: "MD/CFO"
+    MD/Sec: "MD/Sec"
+    PresHLT: "PresHLT"
+    ChairHLT: "ChairHLT"
+    PresCOOStrat: "PresCOOStrat"
+    ChairCEOStrat: "ChairCEOStrat"
+    PresCEO: "PresCEO"
+    VChair: "VChair"
+    Chair: "Chair"
+    ChairCEO: "ChairCEO"
+    ChairPresCEO: "ChairPresCEO"
+  
+#Salesforce Profile Names  
+sfProfileName:
+  bairdSystemAdministrator: "Baird System Administrator"
+  bairdFoundationStandardUser: "Baird Foundation Standard User"
+  communityPlusLogin: "Default Minimum Customer Community Plus Login"
+ 
+#Salesforce User Roles 
+sfUserRole:
+  systemAdministrator: "System Administrator" 
+  foundationStaff: "Foundation Staff"
+  associate: "Associate"   
+  
+#SalesforceDeveloperName
+sfDeveloperName:
+  foundationStaff: "Foundation_Staff"
+  systemAdministrator: "SystemAdministrator"

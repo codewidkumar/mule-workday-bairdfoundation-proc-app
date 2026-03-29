@@ -1,0 +1,9 @@
+sf:
+  clientSecret: "![NP9RQqGe6ksFZZUkMvWibbNgdF3b31Yx90ZQWkmrYqHgGhlAJ1YtObzl0U5PzOo/YfIVmfJtz7qXx+7IGIZXgBQ14vnjXCU0StUS0EbP0kk=]"
+  
+associateService:
+  clientSecret: "![m8e1VkS6IwPXN7yCRnXozjjmJ27vld9b7stOj/GfhzYpLVMC5q0nusUx2Bn4hxoi]"
+
+graphAPI:
+  clientSecret: "![Nx875f1iYD0aMDVvu9SEz8AfodrJF6wU/k3lH5kp11BdckYvTtVct9M7emeivFvh]"
+  

@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<flow name="baird-workday-integration-upsert-bu-accounts-Flow" doc:id="bd094541-96e7-47f4-b6f3-c3764c8ac85c" >
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="c156995a-2f3f-4485-8401-bcacb76b773c" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Sync BU Accounts Flow Started&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" />
+		<set-variable value="#[payload]" doc:name="Set inputPayload" doc:id="dfe866fe-dc1f-453a-8d5a-783caa4b9207" variableName="inputPayload"/>
+		<set-variable value="#[&quot;Select Id from RecordType where DeveloperName = &quot; ++ &quot;'&quot; ++ p('sfQuery.recordTypeDevName') ++ &quot;'&quot; ++ &quot;and SobjectType = &quot; ++ &quot;'&quot; ++ p('sfQuery.sObjectTypeAccount') ++ &quot;'&quot;]" doc:name="Set recordTypeQuery" doc:id="75c99eb7-5945-4937-a6bf-d19f6280d4ba" variableName="recordTypeQuery"/>
+		<salesforce:query doc:name="Query Account RecordTypeId" doc:id="4abd7ec3-753b-4094-b813-dc9f26c12255" config-ref="Salesforce_Config" target="queryResult">
+			<salesforce:salesforce-query><![CDATA[#[vars.recordTypeQuery as String]]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<set-payload value='#[%dw 2.0&#10;output application/json&#10;---&#10;vars.inputPayload[0].Level1Descriptor map (obj) -&gt;{&#10;&#10;    "Baird_BU_ID__c":obj.Id,&#10;    "Name": obj.Name,&#10;    "Parent_Id": obj.ParentId,&#10;    "RecordTypeId": vars.queryResult.Id[0],&#10;    "ParentId":null,&#10;    "Active__c":true,&#10;    "LevelDescriptor":"1"&#10;}]' doc:name="Set Level1 Descriptor" doc:id="2d67e315-337b-40c3-8bdd-d920801b4bca" />
+		<flow-ref doc:name="Flow Reference to upsert-accounts-to-salesforce-flow" doc:id="34860d01-dfb9-4430-a419-b649afaed249" name="upsert-accounts-to-salesforce-flow"/>
+		<ee:transform doc:name="Filter Level2Descriptor" doc:id="198c9aaa-b9ff-42d7-9c0d-be515b1a7858" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.inputPayload[1].Level2Descriptor map (obj) ->{
+
+    "Baird_BU_ID__c":obj.Id,
+    "Name": obj.Name,
+    "Parent_Id": obj.ParentId,
+    "Active__c":true,
+    "RecordTypeId": vars.queryResult.Id[0],
+    "LevelDescriptor":"2"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-payload value='#[%dw 2.0&#10;output application/json&#10;var idMap = vars.buAndSFID groupBy $.Baird_BU_ID__c mapObject (value, key) -&gt; (key): value[0].Id&#10;---&#10;payload map (item) -&gt; &#10;item ++ {&#10;    ParentId: idMap[item.Parent_Id] default null&#10;}]' doc:name="Set Level2 Descriptor" doc:id="4b579775-7530-4bfb-8ce2-66debbc49b57" />
+		<flow-ref doc:name="Flow Reference to upsert-accounts-to-salesforce-flow" doc:id="ab4b1eee-f465-4ee5-816d-23d9e576179e" name="upsert-accounts-to-salesforce-flow"/>
+		<ee:transform doc:name="Filter Level3Descriptor" doc:id="e237d76d-e23c-4f3d-84c1-b9adcce739ae">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.inputPayload[2].Level3Descriptor map (obj) ->{
+
+    "Baird_BU_ID__c":obj.Id,
+    "Name": obj.Name,
+    "Parent_Id": obj.ParentId,
+    "Active__c":true,
+    "RecordTypeId": vars.queryResult.Id[0],
+    "LevelDescriptor":"3"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-payload value='#[%dw 2.0&#10;output application/json&#10;var idMap = vars.buAndSFID groupBy $.Baird_BU_ID__c mapObject (value, key) -&gt; (key): value[0].Id&#10;---&#10;payload map (item) -&gt; &#10;item ++ {&#10;    ParentId: idMap[item.Parent_Id] default null&#10;}]' doc:name="Set Level3 Descriptor" doc:id="833e96ab-ef85-4d9e-a72a-a9ba4d8a9b17" />
+		<flow-ref doc:name="Flow Reference to upsert-accounts-to-salesforce-flow" doc:id="1c52088d-0810-4b0d-8038-588b30898457" name="upsert-accounts-to-salesforce-flow"/>
+		<ee:transform doc:name="Filter Level4Descriptor" doc:id="100c0a41-6ae8-4ff5-bf50-6e5ba80ea242" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.inputPayload[3].Level4Descriptor map (obj) ->{
+
+    "Baird_BU_ID__c":obj.Id,
+    "Name": obj.Name,
+    "Parent_Id": obj.ParentId,
+    "Active__c":true,
+    "RecordTypeId": vars.queryResult.Id[0],
+    "LevelDescriptor":"4"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-payload value='#[%dw 2.0&#10;output application/json&#10;var idMap = vars.buAndSFID groupBy $.Baird_BU_ID__c mapObject (value, key) -&gt; (key): value[0].Id&#10;---&#10;payload map (item) -&gt; &#10;item ++ {&#10;    ParentId: idMap[item.Parent_Id] default null&#10;}]' doc:name="Set Level4 Descriptor" doc:id="e91be47e-936e-4721-b040-282ef4e907ca" />
+		<flow-ref doc:name="Flow Reference to upsert-accounts-to-salesforce-flow" doc:id="938cfc24-31d9-4c66-bc3f-f53fc9dc1b0e" name="upsert-accounts-to-salesforce-flow"/>
+		<ee:transform doc:name="Filter Level5Descriptor" doc:id="b50910f4-f8bc-4fef-a560-38f9ec1de697" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.inputPayload[4].Level5Descriptor map (obj) ->{
+
+    "Baird_BU_ID__c":obj.Id,
+    "Name": obj.Name,
+    "Parent_Id": obj.ParentId,
+    "Active__c":true,
+    "RecordTypeId": vars.queryResult.Id[0],
+    "LevelDescriptor":"5"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-payload value='#[%dw 2.0&#10;output application/json&#10;var idMap = vars.buAndSFID groupBy $.Baird_BU_ID__c mapObject (value, key) -&gt; (key): value[0].Id&#10;---&#10;payload map (item) -&gt; &#10;item ++ {&#10;    ParentId: idMap[item.Parent_Id] default null&#10;}]' doc:name="Set Level5 Descriptor" doc:id="4263988c-e222-4b11-8e97-8c04295a3a2d" />
+		<flow-ref doc:name="Flow Reference to upsert-accounts-to-salesforce-flow" doc:id="a75b70b5-161c-4bcc-99c7-bb3f62313e9c" name="upsert-accounts-to-salesforce-flow"/>
+		<ee:transform doc:name="Filter Level6Descriptor" doc:id="09ab677a-bad9-4d66-9b71-70655746c004" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.inputPayload[5].Level6Descriptor map (obj) ->{
+
+    "Baird_BU_ID__c":obj.Id,
+    "Name": obj.Name,
+    "Parent_Id": obj.ParentId,
+    "Active__c":true,
+    "RecordTypeId": vars.queryResult.Id[0],
+    "LevelDescriptor":"6"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-payload value='#[%dw 2.0&#10;output application/json&#10;var idMap = vars.buAndSFID groupBy $.Baird_BU_ID__c mapObject (value, key) -&gt; (key): value[0].Id&#10;---&#10;payload map (item) -&gt; &#10;item ++ {&#10;    ParentId: idMap[item.Parent_Id] default null&#10;}]' doc:name="Set Level6 Descriptor" doc:id="916c40f3-18ed-422b-89d0-08677918240a" />
+		<flow-ref doc:name="Flow Reference to upsert-accounts-to-salesforce-flow" doc:id="36754ab0-6edf-417e-8f28-eb3bcc458bd9" name="upsert-accounts-to-salesforce-flow"/>
+		<choice doc:name="Check For Failed Records" doc:id="2efb8b89-7d00-4382-badd-e55cac978340" >
+			<when expression="#[!isEmpty(vars.AccountFailedRecords)]">
+				<ee:transform doc:name="Setting Payload for Failed Records" doc:id="5181ee51-a452-415f-9954-ccd4412ae761">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+output application/json
+var AccountFailedRecords = vars.AccountFailedRecords map ((obj,index)->{
+    "LevelDescriptor": obj.LevelDescriptor default "",
+    "Baird_BU_ID__c": obj.Baird_BU_ID__c default "",
+    "Name": obj.Name replace "," with " " default "",
+    "ParentId": obj.Parent_Id default "",
+    "SfParentId": obj.ParentId default "",
+    "RecordTypeId": obj.RecordTypeId default "",
+    "Successful": obj.Successful default "",
+    "StatusCode": obj.StatusCode default "",
+    "Message": obj.Message default "",
+    "TimeStamp": now(),
+})
+---
+{
+	"to": p('email.supportTeam.to'),
+	"subject": p('email.accounts.subject') ++ " | " ++ vars.correlationId,
+	"body": p('email.accounts.body'),
+	"cc": p('email.supportTeam.cc'),
+	"attachments": [{
+		"filename": "FailedAccountRecords.csv",
+		"content": toBase64(write(AccountFailedRecords,"application/csv",{header : true,separator : ","})),
+		"contentType": "plain/text"
+	}]
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+				<flow-ref doc:name="Flow Reference to send-mail-graph-sys-api" doc:id="0c9d1983-d31e-400d-95ad-8d79ece90d4f" name="send-mail-graph-sys-api" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="INFO: Log Info" doc:id="b2cbf479-af2c-4ef1-9942-fe2178d631b6" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Successfully upserted records to Salesforce with no errors&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]"/>
+			</otherwise>
+		</choice>
+		<async doc:name="Async" doc:id="e40bef04-0d5f-4071-b105-ad9d418fa231" >
+			<foreach doc:name="For Each" doc:id="13a440d2-1898-4442-8e70-dcf9e3b52be1" collection='#[["AccountFailedRecords","AccountLoadResults","accessToken","buAndSFID","businessUnitIds","currentDescriptor","duplicateBusinessUnits","filteredBusinessUnits","inputPayload", "queryResult","recordTypeQuery","sfQuery","sfRecordId","sfResponse","upsertRequest"]]'>
+				<remove-variable doc:name="Remove Used Variables" doc:id="5eeb1abe-d5f0-479b-82b3-1efabb7a59dd" variableName="#[payload]"/>
+			</foreach>
+		</async>
+		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="a6698e23-9c92-438f-b04f-11fe2814b91d" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Sync BU Accounts Flow Ended&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" />
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="9cf8e31a-8bbb-4dd7-98ef-00ec1406b9b1" type="ANY">
+				<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="404d0e96-7fb2-46c8-af73-fd1f74bec9d8" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Error&quot;: error.description default &quot;Internal Server Error&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" />
+				<ee:transform doc:name="Setting Payload for Error Details" doc:id="da50de84-9889-4125-85f5-e52ebd540317" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+output application/json
+var errorDescription = if(vars.errorObject == null) (error.description default "Internal Server Error") else vars.errorObject.description
+---
+{
+	"to": p('email.supportTeam.to'),
+	"subject": p('email.error.subject') ++ vars.correlationId,
+	"body": p('email.error.body') ++ error.description ++ "\nCorrelationId: " ++ vars.correlationId ++ "\nTimeStamp: " ++ now() ++"\n\nRegards,\nMulesoft Application\n",
+	"cc": p('email.supportTeam.cc'),
+	"attachments": []
+}
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Flow Reference to send-mail-graph-sys-api" doc:id="daba08e7-b5be-4d61-8c29-b18f655d194f" name="send-mail-graph-sys-api" />
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="upsert-accounts-to-salesforce-flow" doc:id="56316040-84af-43cb-9668-3511ce6fb000" >
+		<logger level="INFO" doc:name="INFO: Log Start" doc:id="f8b2c864-ac7d-44ce-9e63-a8f5d4bcaecd" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Upsert Accounts to Salesforce Flow Started for LevelDescriptor : &quot;  ++ payload.LevelDescriptor[0],&#10;	&quot;Total Records&quot;: sizeOf(payload) default 0,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]"/>
+		<choice doc:name="Check Payload Not Empty" doc:id="c651dafc-ea53-445c-8a4f-653ed12c1d55" >
+			<when expression="#[!isEmpty(payload)]">
+				<foreach doc:name="For Each" doc:id="908b20e5-207c-4ab7-9ead-e002b080cefd" collection="#[payload]" batchSize="${account.batchSize}">
+					<set-variable value="#[%dw 2.0&#10;output application/json&#10;---&#10;payload]" doc:name="Set currentDescriptor" doc:id="03e85b6f-bdcb-44c5-bc4c-38346c4661c8" variableName="currentDescriptor" />
+					<ee:transform doc:name="Filter out Parent_Id" doc:id="fee2f48d-bddb-4bb5-8910-8a60ae993eb5">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map (obj)-> obj - "Parent_Id" - "LevelDescriptor"]]></ee:set-payload>
+			</ee:message>
+			<ee:variables>
+			</ee:variables>
+		</ee:transform>
+					<salesforce:upsert doc:name="Upsert Accounts" doc:id="b1b97e09-357e-4ccf-b0ca-b94e090c9876" config-ref="Salesforce_Config" objectType="Account" externalIdFieldName="Baird_BU_ID__c" />
+					<set-variable value='#[%dw 2.0&#10;output application/json&#10;---&#10;payload.items map (obj)-&gt;{&#10;    "Id": obj.id default ""&#10;}]' doc:name="Store Account Record Ids" doc:id="c6301813-5190-4622-a7d5-535624d99f43" variableName="sfRecordId" />
+					<ee:transform doc:name="Set buAndSFID" doc:id="a8dea28f-7b80-443d-85bd-b30f42c8aa53">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+			<ee:variables>
+							<ee:set-variable variableName="AccountLoadResults" ><![CDATA[%dw 2.0
+output application/json
+---
+(payload.items map (obj,index)->
+{
+    "Message":obj.message,
+    "StatusCode": obj.statusCode,
+    "Successful": obj.successful,
+} ++ vars.currentDescriptor[index])]]></ee:set-variable>
+							<ee:set-variable variableName="buAndSFID" ><![CDATA[%dw 2.0
+output application/json
+---
+(vars.buAndSFID default[]) ++ (vars.currentDescriptor zip vars.sfRecordId map (obj,item)->{
+   "Baird_BU_ID__c": obj.Baird_BU_ID__c[0],
+   "Id": obj.Id[0]
+})  ]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+					<set-variable value='#[%dw 2.0&#10;output application/json&#10;---&#10;(vars.AccountFailedRecords default []) ++ (vars.AccountLoadResults filter ((item) -&gt; item.Successful == false ))]' doc:name="Set AccountLoadError" doc:id="ef3cdbeb-a17c-47a2-bf25-e6e05b840eca" variableName="AccountFailedRecords" />
+				</foreach>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="INFO: Log Info" doc:id="0c44d66f-2b85-4908-8867-8ac5c11c230e" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;No items were processed&quot;,&#10;    &quot;CorrelationId&quot;: vars.correlationId,&#10;    &quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]"/>
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="INFO: Log End" doc:id="b1764831-18bf-48fb-9601-852047664e2d" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Upsert Accounts to Salesforce Flow Ended&quot;,&#10;	&quot;No of Failed Records&quot;: sizeOf(vars.AccountFailedRecords) default 0,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Account&quot;&#10;}]" />
+	</flow>
+</mule>

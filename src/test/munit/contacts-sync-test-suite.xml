@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+	xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="contacts-sync-test-suite.xml" />
+	<munit:test name="sync-contacts-to-sf-subflow-test-success"
+		description="Test Sync Contacts flow with success">
+		<munit:behavior>
+			<munit-tools:mock-when
+				processor="salesforce:create-job-bulk-api-v2">
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value='#[{"id": "750xxxxxxxxx", "state": "UploadComplete"}]'
+						mediaType="application/java" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when
+				processor="mule:flow-ref">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="sf-check-job-status" attributeName="name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:variables>
+						<munit-tools:variable key="failedRecords"
+							value="#[[]]" />
+						<munit-tools:variable key="successRecords"
+							value="#[[{'id': '003xxx'}]]" />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when
+				processor="mule:flow-ref">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="send-mail-graph-sys-api" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:mock-when>
+
+			<munit:set-event doc:name="Set Input Payload">
+				<munit:payload
+					value='#[%dw 2.0 output application/json --- [{&#10;                "Employee_ID__c": "12345",&#10;                "FirstName": "John",&#10;                "LastName": "Doe",&#10;                "Email": "john.doe@example.com"&#10;            }]]'
+					mediaType="application/json" />
+				<munit:variables>
+					<munit:variable key="correlationId"
+						value="TEST-SYNC-ID" />
+				</munit:variables>
+			</munit:set-event>
+		</munit:behavior>
+
+		<munit:execution>
+			<flow-ref name="sync-contacts-to-sf-subflow" />
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:verify-call
+				processor="salesforce:create-job-bulk-api-v2" times="1" />
+
+			<munit-tools:assert-that
+				expression="#[vars.jobIds[0]]"
+				is="#[MunitTools::equalTo('750xxxxxxxxx')]"
+				doc:name="Assert Job ID matches the mocked value" />
+
+			<munit-tools:assert-that
+				expression="#[sizeOf(vars.jobIds)]" is="#[MunitTools::equalTo(1)]"
+				doc:name="Verify exactly one Job ID was captured" />
+		</munit:validation>
+	</munit:test>
+</mule>

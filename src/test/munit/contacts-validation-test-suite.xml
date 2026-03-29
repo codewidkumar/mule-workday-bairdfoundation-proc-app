@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+	xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+
+	<munit:config name="workday-contacts-sf-sync-test.xml" />
+
+	<munit:test name="workday-contacts-sf-sync-happy-path-test"
+		description="Test successful orchestration of contact sync">
+		<munit:behavior>
+			<munit-tools:mock-when
+				doc:name="Mock invokeWorkdayImpl" processor="mule:flow-ref">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="invokeWorkdayImpl" attributeName="name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value="#[[{'workerID': '123'}]]" mediaType="application/json" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when
+				doc:name="Mock baird-workday-contact-sync-subflow"
+				processor="mule:flow-ref">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="baird-workday-contact-sync-subflow"
+						attributeName="name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value="#[[{'Email': 'test@baird.com'}]]"
+						mediaType="application/json" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when
+				doc:name="Mock sync-contacts-to-sf-subflow"
+				processor="mule:flow-ref">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="sync-contacts-to-sf-subflow" attributeName="name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value="#[{'status': 'success'}]" mediaType="application/json" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+
+		<munit:execution>
+			<munit:set-event doc:name="Set Initial Data">
+				<munit:variables>
+					<munit:variable key="correlationId"
+						value="MUNIT-CONTACT-001" />
+				</munit:variables>
+			</munit:set-event>
+			<flow-ref doc:name="Flow-ref to workday-contacts-sf-sync"
+				name="workday-contacts-sf-sync" />
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:verify-call
+				doc:name="Verify Workday Call" processor="mule:flow-ref" times="1">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="invokeWorkdayImpl" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:verify-call>
+
+			<munit-tools:verify-call
+				doc:name="Verify SF Sync Call" processor="mule:flow-ref" times="1">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="sync-contacts-to-sf-subflow" attributeName="name" />
+				</munit-tools:with-attributes>
+			</munit-tools:verify-call>
+		</munit:validation>
+	</munit:test>
+	<munit:test name="baird-workday-contact-sync-subflow-test-success" description="Test the full mapping logic with owner and manager resolution">
+		<munit:behavior >
+			<munit-tools:mock-when doc:name="Mock RecordType Query" processor="salesforce:query">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="b27b29e6-7411-42b7-82a2-72bbeafac3aa" attributeName="doc:id" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="recordTypeId" value="#[{Id: ['RT_12345']}]" />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+
+			<munit-tools:mock-when doc:name="Mock Account Mapping" processor="mule:flow-ref">
+				<munit-tools:with-attributes >
+					<munit-tools:with-attribute whereValue="baird-sf-id-mapping-subflow" attributeName="name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return >
+					<munit-tools:variables >
+						<munit-tools:variable key="empsAccountsDetails" value="#[[{BUid: 'BU-99', Id: 'SF_ACC_99'}]]" />
+					</munit-tools:variables>
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+
+		<munit:execution >
+			<munit:set-event doc:name="Set Input Context">
+				<munit:variables >
+					<munit:variable key="correlationId" value="MUNIT-B-001" />
+					<munit:variable key="userEmployeeNumbers" value="#[[{EmployeeNumber: 'E100', Id: 'U_100', IsActive: 'true'}]]" />
+					<munit:variable key="salesforceBFSystemAdministrator" value="#[['E100']]" />
+					<munit:variable key="salesforceBFStandardUserAdministrator" value="#[[]]" />
+					<munit:variable key="validWorkers" value="#[[
+						{
+							EmpId: 'E100',
+							FirstName: 'Test',
+							LastName: 'User',
+							Emails: [{EmailAddressTypeCode: 'BRDEMAIL', EmailAddress: 'test@baird.com'}],
+							Phones: [{TelecommunicationsNumberTypeCode: 'WORK', Type: 'Landline', AreaCode: '414', ContactNumber: '5551234'}],
+							Location: {CityName: 'Milwaukee', CountryCode: 'US'},
+							BusinessUnitOrganization: {Descriptor: {Id: 'BU-99'}},
+							EmploymentDetail: {Active: true},
+							JobPositionDetail: {SupervisorEmpId: 'E100'}
+						}
+					]]" />
+				</munit:variables>
+			</munit:set-event>
+			<flow-ref doc:name="Flow-ref" name="baird-workday-contact-sync-subflow" />
+		</munit:execution>
+
+		<munit:validation >
+			<munit-tools:assert-that doc:name="Verify AccountId Resolved" 
+				expression="#[payload[0].AccountId]" 
+				is="#[MunitTools::equalTo('SF_ACC_99')]" />
+			
+			<munit-tools:assert-that doc:name="Verify RecordTypeId" 
+				expression="#[payload[0].RecordTypeId]" 
+				is="#[MunitTools::equalTo('RT_12345')]" />
+
+			<munit-tools:assert-that doc:name="Verify OwnerId Mapping" 
+				expression="#[payload[0].OwnerId]" 
+				is="#[MunitTools::equalTo('U_100')]" />
+		</munit:validation>
+	</munit:test>
+	<munit:test name="baird-sf-id-mapping-subflow-test"
+		description="Test accumulation of account mapping data">
+		<munit:behavior>
+			<munit-tools:mock-when
+				doc:name="Mock SF Account Query" processor="salesforce:query">
+				<munit-tools:with-attributes>
+					<munit-tools:with-attribute
+						whereValue="Fetch SF Account Id for Descriptor Ids"
+						attributeName="doc:name" />
+				</munit-tools:with-attributes>
+				<munit-tools:then-return>
+					<munit-tools:payload
+						value="#[%dw 2.0
+output application/java
+---
+[{
+    Baird_BU_ID__c: 'BU_999', 
+    Id: '001Account001'
+}]]"
+						mediaType="application/java" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+
+		<munit:execution>
+			<munit:set-event
+				doc:name="Set bairdIds and Init Accumulator">
+				<munit:variables>
+					<munit:variable key="bairdIds" value="#[['BU_999']]" />
+					<munit:variable key="empsAccountsDetails"
+						value="#[[]]" />
+					<munit:variable key="correlationId"
+						value="TEST-BAIRD-ID" />
+				</munit:variables>
+			</munit:set-event>
+			<flow-ref doc:name="Flow-ref"
+				name="baird-sf-id-mapping-subflow" />
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-that
+				doc:name="Assert Data Accumulated"
+				expression="#[sizeOf(vars.empsAccountsDetails)]"
+				is="#[MunitTools::equalTo(1)]" />
+			<munit-tools:assert-that
+				doc:name="Verify Correct BU ID"
+				expression="#[vars.empsAccountsDetails[0].BUid]"
+				is="#[MunitTools::equalTo('BU_999')]" />
+		</munit:validation>
+	</munit:test>
+	<munit:test name="invokeWorkdayImpl-subflow-test"
+    description="Test invokeWorkdayImpl subflow - happy path">
+
+    <munit:behavior>
+        <set-variable variableName="correlationId"
+            value="TEST-CORR-ID" doc:name="Set correlationId" />
+
+        <munit-tools:mock-when processor="http:request">
+            <munit-tools:with-attributes>
+                <munit-tools:with-attribute
+                    attributeName="doc:name" whereValue="Request to fetch Token" />
+            </munit-tools:with-attributes>
+            <munit-tools:then-return>
+                <munit-tools:payload
+                    value="#[{ access_token: 'TEST_TOKEN' }]" />
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+
+        <munit-tools:mock-when processor="http:request">
+            <munit-tools:with-attributes>
+                <munit-tools:with-attribute
+                    attributeName="doc:name" whereValue="Request to /workers" />
+            </munit-tools:with-attributes>
+            <munit-tools:then-return>
+                <munit-tools:payload
+                    value="#[[{ EmpId: 'E001', UserName: 'john', FirstName: 'John', LastName: 'Doe', Emails: [{EmailAddressTypeCode: 'BRDEMAIL', EmailAddress: 'j@b.com'}], EmploymentDetail: {HireDate: '2020-01-01', Active: true} }]]" />
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+
+        <munit-tools:mock-when processor="salesforce:query">
+            <munit-tools:with-attributes>
+                <munit-tools:with-attribute
+                    attributeName="doc:name" whereValue="Query All User EmployeesData" />
+            </munit-tools:with-attributes>
+            <munit-tools:then-return>
+                <munit-tools:variables>
+                    <munit-tools:variable key="userEmployeeNumbers" 
+                        value="#[[{ EmployeeNumber: 'E001', Id: 'SF_ID_001', IsActive: true }]]" />
+                </munit-tools:variables>
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+
+        <munit-tools:mock-when processor="http:request">
+            <munit-tools:with-attributes>
+                <munit-tools:with-attribute
+                    attributeName="doc:name" whereValue="Request to fetch SalesforceBFSystemAdministrator AD Group" />
+            </munit-tools:with-attributes>
+            <munit-tools:then-return>
+                <munit-tools:variables>
+                    <munit-tools:variable key="salesforceBFSystemAdministrator" value="#[['ADMIN_1']]" />
+                </munit-tools:variables>
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+
+        <munit-tools:mock-when processor="http:request">
+            <munit-tools:with-attributes>
+                <munit-tools:with-attribute
+                    attributeName="doc:name" whereValue="Request to fetch SalesforceBFStandardUserAdministrator AD Group" />
+            </munit-tools:with-attributes>
+            <munit-tools:then-return>
+                <munit-tools:variables>
+                    <munit-tools:variable key="salesforceBFStandardUserAdministrator" value="#[['STD_1']]" />
+                </munit-tools:variables>
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+
+        <munit-tools:mock-when processor="flow-ref">
+            <munit-tools:with-attributes>
+                <munit-tools:with-attribute
+                    attributeName="name" whereValue="workers-validation-subflow" />
+            </munit-tools:with-attributes>
+            <munit-tools:then-return>
+                <munit-tools:variables>
+                    <munit-tools:variable key="validWorkers" value="#[[{ EmpId: 'E001' }]]" />
+                    <munit-tools:variable key="invalidWorkers" value="#[[]]" />
+                </munit-tools:variables>
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+
+    </munit:behavior>
+
+    <munit:execution>
+        <flow-ref name="invokeWorkdayImpl" />
+    </munit:execution>
+
+    <munit:validation>
+        <munit-tools:verify-call processor="http:request" times="4" />
+
+        <munit-tools:verify-call processor="salesforce:query" times="1" />
+
+        <munit-tools:verify-call processor="flow-ref" times="1">
+            <munit-tools:with-attributes>
+                <munit-tools:with-attribute
+                    attributeName="name" whereValue="workers-validation-subflow" />
+            </munit-tools:with-attributes>
+        </munit-tools:verify-call>
+
+        <munit-tools:assert-that expression="#[vars.validWorkers]" 
+            is="#[MunitTools::notNullValue()]" />
+        <munit-tools:assert-that expression="#[vars.salesforceBFSystemAdministrator]" 
+            is="#[MunitTools::notNullValue()]" />
+    </munit:validation>
+
+</munit:test>
+</mule>

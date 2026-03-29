@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="47603b0b-2b8b-4ca6-b385-a32181496cb8" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<sub-flow name="upsert-user-contact-subflow" doc:id="2c176368-7485-4180-9f1a-ef4cd906a655" >
+		<flow-ref doc:name="Flow Reference to user-manager-update-subflow" doc:id="c0f17dd5-f881-4f25-8889-34c676b7398e" name="user-manager-update-subflow"/>
+	</sub-flow>
+	<sub-flow name="user-manager-update-subflow" doc:id="c4e027fa-bc73-4b4a-84a6-849544219a30" >
+		<salesforce:query doc:name="Query User" doc:id="186fde71-fb5c-475f-8ec9-e72576a91e0f" config-ref="Salesforce_Config" target="userSFEmployeeNumbers">
+			<salesforce:salesforce-query><![CDATA[SELECT Id, IsActive, EmployeeNumber FROM User where EmployeeNumber != null]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Set Manager &amp; User Mapping" doc:id="55a7627c-29af-48d1-a1e3-c5cf85b1fa61" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.validWorkers map ((item,index)->{
+	"Manager__c": do{
+		var userData = (vars.userSFEmployeeNumbers filter($.EmployeeNumber == item.JobPositionDetail.SupervisorEmpId))[0]
+		---
+		if ( (userData != null) and
+        (userData.IsActive == "true") ) (userData.Id)
+        else "#N/A"
+	},
+	"User__c": do{
+		var userData = (vars.userSFEmployeeNumbers filter($.EmployeeNumber == item.EmpId))[0]
+		---
+		if ( (userData != null) ) (userData.Id)
+                else "#N/A"
+	},
+	"Id": (vars.userSFEmployeeNumbers filter($.EmployeeNumber == item.EmpId))[0].Id default ""
+})]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="9074f5b5-6d16-49e1-a960-ba893ce08864" collection="#[payload]" batchSize="2" >
+			<salesforce:update type="Contact" doc:name="Update Contact" doc:id="1da58767-b4f9-401d-9a3f-eb2130ebf3d8" config-ref="Salesforce_Config" />
+		</foreach>
+	</sub-flow>
+</mule>

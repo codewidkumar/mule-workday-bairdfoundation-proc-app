@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<flow name="workday-contacts-sf-sync" doc:id="eeea5578-4802-4080-b3f7-f60dc74752bb" >
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="b7e30a08-1470-4237-9f90-ceb815a07c0c" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;   	&quot;APIName&quot; : p('api.name'),&#10;   	&quot;FlowName&quot; : flow.name,&#10;   	&quot;Message&quot; : &quot;Before starting validation and contact sync subflow&quot;,&#10;   	&quot;CorrelationID&quot; : vars.correlationId,&#10;   	&quot;Timestamp&quot; : now(),&#10;   	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]"/>
+		<flow-ref doc:name="Fetch data from workday" doc:id="5ab7b140-25e8-4a8f-8f86-011a5479fa48" name="invokeWorkdayImpl"/>
+		<flow-ref doc:name="Flow Reference to baird-workday-contact-sync-subflow" doc:id="21c07776-a3b4-4843-a92f-b23c98171ea4" name="baird-workday-contact-sync-subflow"/>
+		<logger level="DEBUG" doc:name="DEBUG: Log Contact details" doc:id="aae3d158-06b7-46df-90b5-284dac8d0afb" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Before syncing contact details&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;,&#10;   	&quot;Payload&quot;: payload&#10;}]" category="contacts.sync"/>
+		<flow-ref doc:name="Flow Reference to sync-contacts-to-sf-subflow" doc:id="70526ab5-9a19-40f9-9ba8-b720772c5a2a" name="sync-contacts-to-sf-subflow"/>
+		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="59824414-84fb-4a2f-a0e7-804616d9f4cf" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;After contacts are synced&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]"/>
+		<error-handler>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="184525d1-f42f-49b3-940e-e4f564cef69d" type="ANY" >
+				<logger level="ERROR" doc:name="ERROR: Log ERROR" doc:id="0b25b01d-bfa8-4453-b19d-d20fdc554e9b" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description,&#10;	&quot;CorrelationId&quot;: correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;}]" />
+				<ee:transform doc:name="Email payload" doc:id="a29b5813-b35e-4d14-986b-7cc776cd7d2c" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+output application/json
+var errorDescription = if(vars.errorObject == null) (error.description default "Internal Server Error") else vars.errorObject.description
+---
+{
+	"to": p('email.supportTeam.to'),
+	"subject": p('email.error.subject') ++ vars.correlationId,
+	"body": p('email.error.body') ++ error.description ++ "\nCorrelationId: " ++ vars.correlationId ++ "\nTimeStamp: " ++ now() ++"\n\nRegards,\nMulesoft Application\n",
+	"cc": p('email.supportTeam.cc'),
+	"attachments": []
+}
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="Flow Reference to send-mail-graph-sys-api" doc:id="e0a217f2-c3a5-453e-8859-7e4ec3c8bac3" name="send-mail-graph-sys-api" />
+				<os:store doc:name="Set Current Sync State" doc:id="39729b61-065b-4a92-85b1-aed725ffb7d4" key="syncState" objectStore="Object_store_syncStatus" >
+					<os:value ><![CDATA[#["Stopped"]]]></os:value>
+				</os:store>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<sub-flow name="baird-workday-contact-sync-subflow" doc:id="ac15351e-633c-42fd-9c7c-8e3ac5f2d6ee" >
+		<logger level="INFO" doc:name="INFO: Log Entry" doc:id="e87be435-3883-40a3-978e-60f8164c4bfb" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Before starting contact validation subflow&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]"/>
+		<ee:transform doc:name="SF Queries And Variables" doc:id="8f107cbc-4bc7-4361-a84c-ef3d72058278" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="queries" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"recordTypeQuery" :"SELECT Id from RecordType where DeveloperName = 'Associate' and SobjectType = 'Contact'"
+}]]></ee:set-variable>
+				<ee:set-variable variableName="empIds" ><![CDATA[%dw 2.0
+output application/json
+---
+(vars.validWorkers.EmpId ++ vars.validWorkers.JobPositionDetail.SupervisorEmpId distinctBy $) filter $ != null]]></ee:set-variable>
+				<ee:set-variable variableName="empsContactDetails" ><![CDATA[%dw 2.0
+output application/json
+---
+vars.userEmployeeNumbers map ((item, index) ->
+{
+	"EmpId": item.EmployeeNumber,
+	"Id": item.Id
+}
+)]]></ee:set-variable>
+				<ee:set-variable variableName="bairdIds" ><![CDATA[%dw 2.0
+output application/json
+---
+(vars.validWorkers.BusinessUnitOrganization.Descriptor.Id distinctBy $) filter $ != null]]></ee:set-variable>
+				<ee:set-variable variableName="empsAccountsDetails" ><![CDATA[[]]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<salesforce:query doc:name="Fetch RecordTypeID from RecordType" doc:id="b27b29e6-7411-42b7-82a2-72bbeafac3aa" config-ref="Salesforce_Config" target="recordTypeId">
+			<salesforce:salesforce-query ><![CDATA[#[vars.queries.recordTypeQuery]]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<flow-ref doc:name="baird-sf-id-mapping-subflow" doc:id="eff637c2-aea4-4ff9-b87a-3e997df90054" name="baird-sf-id-mapping-subflow"/>
+		<ee:transform doc:name="Contact Upsert SF Payload" doc:id="9ceb7be6-488b-4795-a54d-b20841e89e66">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+fun createString(str)=
+(trim (str filter ((item, index) -> item != null) joinBy " "))
+var empMappedIds = vars.empsContactDetails map ((item, index) ->
+    (item.EmpId) : (item.Id)
+)
+var accountMappedIds = vars.empsAccountsDetails map ((item, index) ->
+    (item.BUid) : (item.Id)
+)
+fun getPhone(data) = do{
+    var AreaCode = data.AreaCode
+    var ContactNumber = data.ContactNumber
+    ---
+    if(data != null  and AreaCode != null and ContactNumber != null) (AreaCode ++ "-" ++ ContactNumber)
+    else if(data !=null and AreaCode != null and ContactNumber == null) AreaCode
+    else if(data !=null and AreaCode == null and ContactNumber != null) ContactNumber
+    else "#N/A"
+}
+---
+(vars.validWorkers default [] map ((item, index) ->
+{
+	"FirstName": item.FirstName  default null,
+	"LastName": item.LastName  default null,
+	"Suffix": item.Suffix  default "#N/A",
+	"Email": if ( (p('api.env') == "PROD")) (lower((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]))
+			 else (lower((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) ++ ".invalid"),
+	"Phone": getPhone((item.Phones filter($.TelecommunicationsNumberTypeCode == "WORK" and $.Type == "Landline"))[0]),
+	"Employee_ID__c": item.EmpId,
+	"MailingStreet": createString([item.Location.Address1,item.Location.Address2,item.Location.Address3,item.Location.Address4]) default "#N/A",
+	"MailingCity": item.Location.CityName default "#N/A",
+	"MailingPostalCode": item.Location.PostalCode  default "#N/A",
+	"MailingState": item.Location.StateAbbreviation  default "#N/A",
+	"MailingCountry": item.Location.CountryCode  default "#N/A",
+	"Title": item.ProfessionalTitleName  default "#N/A",
+	"Officer_Title__c": Mule::p('officerType'++"."++ (item.OfficerTitleCode)) default "#N/A",
+	"Preferred_Name__c": createString([item.PreferredLastName,item.PreferredFirstName,item.PreferredMiddleName]) default "#N/A",
+	"RecordTypeId": vars.recordTypeId.Id[0] default null,
+	"User__c": empMappedIds[item.EmpId][0] default "#N/A",
+	"Manager__c": do{
+		var userData = (vars.userEmployeeNumbers filter($.EmployeeNumber == item.JobPositionDetail.SupervisorEmpId))[0]
+		---
+		if ( (userData != null) and
+        (userData.IsActive == "true"))(empMappedIds[item.JobPositionDetail.SupervisorEmpId][0])
+        else "#N/A"
+	},
+	"GL_Code__c": item.EmployeeCostCenter default "#N/A",
+	"Active__c": item.EmploymentDetail.Active default null,
+	"Ethnic_Group__c": item.PersonalDetail.EthnicGroupName default "#N/A",
+	"Gender__c": item.PersonalDetail.GenderCode default "#N/A",
+	"Address_Floor__c": item.Location.Floor default "#N/A",
+	"Department_Name__c": item.Department.Name default "#N/A",
+    "OwnerId": do {
+    var userData = (vars.userEmployeeNumbers filter ($.EmployeeNumber == item.EmpId))[0]
+    ---
+    if (
+        (userData != null) and
+        (userData.IsActive == "true") and
+        (
+            (vars.salesforceBFSystemAdministrator contains item.EmpId) or
+            (vars.salesforceBFStandardUserAdministrator contains item.EmpId)
+        )
+    )
+        userData.Id
+    else null
+},
+	"Hire_Date__c": item.EmploymentDetail.HireDate default "#N/A",
+	"AccountId": accountMappedIds[item.BusinessUnitOrganization.Descriptor.Id][0] default null,
+	"Termination_Date__c": item.EmploymentDetail.TerminationDate default "#N/A"
+}
+))]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="INFO: Log Exit" doc:id="22d37d9d-2bf1-4b41-b16a-e46d5e20e307" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Ending contact validation flow&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;&#10;}]"/>
+	
+</sub-flow>
+
+	<sub-flow name="baird-sf-id-mapping-subflow" doc:id="21b75c90-c77b-4470-a397-6bd11b8e0ab4" >
+		<foreach doc:name="FOR EACH in bairdIds" doc:id="089e8405-b4e7-44b4-86bc-d647b5a86430" collection="#[vars.bairdIds]" batchSize="${batch.empContacts}" >
+			<ee:transform doc:name="Select Query Account" doc:id="004a8541-447a-43c5-8444-38e3bc041d27" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"SELECT Id,Baird_BU_ID__c FROM Account WHERE Baird_BU_ID__c IN ('" ++
+(payload joinBy ("','")) ++ "')"
+]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<logger level="DEBUG" doc:name="DEBUG: Log Outbound" doc:id="01494bbb-03aa-4120-8dc2-3ffcdbf32314" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Before fetching Baird_BU_Id__c and Id from Account Object&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;,&#10;	&quot;BatchNo&quot;: vars.counter default null,&#10;	&quot;BatchSize&quot;: p('batch.empContacts') default null,&#10;	&quot;Query&quot;: payload default null&#10;}]" category="contacts.sync"/>
+			<salesforce:query doc:name="Fetch SF Account Id for Descriptor Ids" doc:id="9e72c927-1ece-48ba-8acf-6006de892287" config-ref="Salesforce_Config" >
+				<salesforce:salesforce-query ><![CDATA[#[payload]]]></salesforce:salesforce-query>
+			</salesforce:query>
+			<logger level="DEBUG" doc:name="DEBUG: Log Inbound" doc:id="6198f59a-00d7-4c52-a886-75fed3367bb7" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;After fetching Baird_BU_Id__c and Id from Account Object&quot;,&#10;	&quot;CorrelationID&quot;: vars.correlationId,&#10;	&quot;Timestamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Contact&quot;,&#10;	&quot;BatchNo&quot;: vars.counter default null,&#10;	&quot;BatchSize&quot;: p('batch.empContacts') default null,&#10;	&quot;SFResponse&quot;: (payload filter ((item, index) -&gt; item.Baird_BU_ID__c != null)) map ((item, index) -&gt;&#10;{&#10;		&quot;BUid&quot;: item.Baird_BU_ID__c,&#10;		&quot;Id&quot;: item.Id&#10;	}&#10;)&#10;}]" category="contacts.sync"/>
+			<ee:transform doc:name="Accumulate EmpData for further operations" doc:id="73cc1027-7e04-463d-b61c-1bbd9c9fbb34" >
+				<ee:message />
+				<ee:variables >
+					<ee:set-variable variableName="empsAccountsDetails" ><![CDATA[%dw 2.0
+output application/json
+---
+vars.empsAccountsDetails ++ ((payload filter ((item, index) -> item.Baird_BU_ID__c != null) ) map ((item, index) ->
+{
+    "BUid" : item.Baird_BU_ID__c,
+    "Id" : item.Id
+}
+))]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+	</sub-flow>
+	<sub-flow name="invokeWorkdayImpl" doc:id="02a48dd5-85c3-4031-908f-1df41e561d74" >
+		<try doc:name="Try" doc:id="7993a050-104d-4d2b-9b53-9da0c71c640f" >
+			<until-successful maxRetries="${worker.untilSuccessful.maxRetries}" doc:name="Until Successful" doc:id="6ed51793-cd36-47c9-9306-b1aaad399208" millisBetweenRetries="${worker.untilSuccessful.interval}" >
+				<try doc:name="Try" doc:id="877b1f82-e0be-4b10-976a-cffe65ae0788" >
+					<logger level="INFO" doc:name="INFO: Log Info" doc:id="c4dcc6b3-5ac9-491b-8099-1a3175982a7e" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch Token for Associate Services&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+					<http:request method="${associateService.token.method}" doc:name="Request to fetch Token" doc:id="84abfb67-50a0-4994-afdd-f4c5674c716c" config-ref="HTTP_Request_configuration_associate_service" path="${associateService.token.path}" >
+						<http:body ><![CDATA[#[%dw 2.0
+output urlencoded
+---
+{
+	grant_type: "client_credentials",
+	client_id: p('associateService.clientId'),
+	client_secret: p('secure::associateService.clientSecret')
+}]]]></http:body>
+						<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Content-Type" : "application/x-www-form-urlencoded"
+}]]]></http:headers>
+					</http:request>
+					<logger level="INFO" doc:name="INFO: Log Info1" doc:id="4875694a-28d0-4679-857a-5e2db07525c2" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch Workers Data from Associate Services&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+					<http:request method="${associateService.workers.method}" doc:name="Request to /workers" doc:id="a6f5ea8e-7c0a-4a85-86bb-28ab0f990c94" config-ref="HTTP_Request_configuration_associate_service" path="${associateService.workers.path}" >
+						<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ payload.access_token,
+	"Accept": "application/json"
+}]]]></http:headers>
+					</http:request>
+					<logger level="INFO" doc:name="INFO: Log Info2" doc:id="4729d722-43ef-434b-9af7-8df17f5fe7f2" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Succesfully fetched Associate Services Workers Data. Count : &quot; ++ (sizeOf(payload) default 0),&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+					<error-handler >
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue for Connectivity  Failures" doc:id="96491027-b0ee-49b4-8cea-1627d298108d" when='#[error.errorType.identifier != "CONNECTIVITY"]' >
+							<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="02bab688-f09c-43f3-9997-10c57ffe1450" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+							<ee:transform doc:name="Set errorObject" doc:id="ae3ff455-3c02-4f29-aa4b-7dfdff89ac77" >
+								<ee:message />
+								<ee:variables >
+									<ee:set-variable variableName="errorObject" ><![CDATA[%dw 2.0
+output application/java
+---
+error]]></ee:set-variable>
+								</ee:variables>
+							</ee:transform>
+						</on-error-continue>
+					</error-handler>
+				</try>
+			</until-successful>
+			<validation:is-true doc:name="Is true" doc:id="ee5b4ae7-1300-4755-9d2e-5f8b24fcd069" expression="#[vars.errorObject == null]" message="#[vars.errorObject.detailedDescription]" />
+			<error-handler >
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate for other erros" doc:id="2d48a7c1-e63a-4773-b39a-52aa5656579a" type="ANY" >
+					<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="16fa365e-3449-4f97-a758-dc779982b767" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: vars.errorObject.detailedDescription,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+				</on-error-propagate>
+			</error-handler>
+		</try>
+		<logger level="INFO" doc:name="INFO: Log Info" doc:id="db18f6b7-339c-4820-9dff-2cad5de10f39" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SF Users Data&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+		<salesforce:query doc:name="Query All User EmployeesData" doc:id="d5707859-9ba8-4e2e-a1d0-f99de2bf86a6" config-ref="Salesforce_Config" target="userEmployeeNumbers" targetValue="#[output application/json&#10;---&#10;payload]" >
+			<ee:repeatable-file-store-iterable inMemoryObjects="5000" />
+			<salesforce:salesforce-query ><![CDATA[Select Id, EmployeeNumber,ProfileId,UserRoleId,IsActive from User where EmployeeNumber != null]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<flow-ref doc:name="Flow Reference to workers-validation-flow" doc:id="c662e1e1-db40-4a44-b8f6-a295191efaf6" name="workers-validation-subflow" />
+		<try doc:name="Try" doc:id="c699ac8a-f2cd-429b-8f3b-2c8be33074ef" >
+			<until-successful maxRetries="${worker.untilSuccessful.maxRetries}" doc:name="Until Successful" doc:id="8a28a151-8e97-407d-8831-82d874f0cd9d" millisBetweenRetries="${worker.untilSuccessful.interval}" >
+				<try doc:name="Try" doc:id="40e5ede8-e88f-45e3-ac89-e304a92813dc" >
+					<logger level="INFO" doc:name="INFO: Log Info" doc:id="9a79a361-a016-475f-807e-a7dadada25e0" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SalesforceBFSystemAdministrator AD Group&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+					<http:request method="${graphAPI.members.method}" doc:name="Request to fetch SalesforceBFSystemAdministrator AD Group" doc:id="737b07ba-b930-4302-8ee4-301f5cc3cd13" config-ref="HTTP_Request_configuration_Graph_Sys_Api" path="${graphAPI.members.path}" target="salesforceBFSystemAdministrator" targetValue="#[payload.response.employeeId]" >
+						<http:headers ><![CDATA[#[output application/java
+---
+{
+	"x-transactionId" : correlationId,
+	"client_secret": p('secure::graphAPI.clientSecret'),
+	"client_id": p('graphAPI.clientId'),
+	"source": "WorkdaySalesforceSyncApplication",
+	"x-msg-timestamp": (now() >> "America/Chicago") as String
+}]]]></http:headers>
+						<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"groupId" : p('groupId.adminUser')
+}]]]></http:uri-params>
+					</http:request>
+					<logger level="INFO" doc:name="INFO: Log Info1" doc:id="2b0ee085-4510-45b1-957d-b46394d0f515" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: &quot;Request to fetch SalesforceBFStandardUserAdministrator AD Group&quot;,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+					<http:request method="${graphAPI.members.method}" doc:name="Request to fetch SalesforceBFStandardUserAdministrator AD Group" doc:id="99e95427-ab47-4950-97b6-e2f299622f85" config-ref="HTTP_Request_configuration_Graph_Sys_Api" path="${graphAPI.members.path}" target="salesforceBFStandardUserAdministrator" targetValue="#[payload.response.employeeId]" >
+						<http:headers ><![CDATA[#[output application/java
+---
+{
+	"x-transactionId" : correlationId,
+	"client_secret": p('secure::graphAPI.clientSecret'),
+	"client_id": p('graphAPI.clientId'),
+	"source": "WorkdaySalesforceSyncApplication",
+	"x-msg-timestamp": (now() >> "America/Chicago") as String
+}]]]></http:headers>
+						<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"groupId" : p('groupId.standardUser')
+}]]]></http:uri-params>
+					</http:request>
+					<error-handler >
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue for Connectivity  Failures" doc:id="a5e7e905-b8d4-48ab-a0d4-58508c138a52" when='#[error.errorType.identifier != "CONNECTIVITY"]' >
+							<logger level="ERROR" doc:name="ERROR: Log Error" doc:id="d19799a4-6971-4b76-b6a5-1be70de05105" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: error.description,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+							<ee:transform doc:name="Set errorObject" doc:id="2e55d88e-d64e-4139-9599-fe6436e76fba" >
+								<ee:message >
+									<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+}]]></ee:set-payload>
+								</ee:message>
+								<ee:variables >
+									<ee:set-variable variableName="errorObject" ><![CDATA[%dw 2.0
+output application/java
+---
+error]]></ee:set-variable>
+								</ee:variables>
+							</ee:transform>
+						</on-error-continue>
+					</error-handler>
+				</try>
+			</until-successful>
+			<validation:is-true doc:name="Is true" doc:id="af365acb-1ed1-4a92-8cc4-b42b23f4bf27" expression="#[vars.errorObject == null]" message="#[vars.errorObject.detailedDescription]" />
+			<error-handler >
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate for other erros" doc:id="508aa89a-32ca-486b-8374-1bfdf55ba460" type="ANY" >
+					<logger level="ERROR" doc:name="log-error" doc:id="fc9f7e0e-7e6f-49fa-941a-fc039f8e4ee6" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&quot;APIName&quot;: p('api.name'),&#10;	&quot;FlowName&quot;: flow.name,&#10;	&quot;Message&quot;: vars.errorObject.detailedDescription,&#10;	&quot;CorrelationId&quot;: vars.correlationId,&#10;	&quot;TimeStamp&quot;: now(),&#10;	&quot;BusinessKey&quot;: &quot;Worker&quot;&#10;}]" />
+				</on-error-propagate>
+			</error-handler>
+		</try>
+	</sub-flow>
+	<sub-flow name="workers-validation-subflow" doc:id="4060620b-8513-4024-bc28-fa7eff3d20e6" >
+		<ee:transform doc:name="Partition Valid and Invalid Workers" doc:id="3a0547de-4dcf-4b93-998e-6ab10604cafc" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+import * from dw::core::Arrays
+output application/json
+var partitioned = payload partition ((item) -> 
+	((item.Emails == null or (((item.Emails filter($.EmailAddressTypeCode == "BRDEMAIL")).EmailAddress[0]) == null)) or 
+		(item.FirstName == null or isEmpty(item.FirstName)) or 
+		(item.LastName == null or isEmpty(item.LastName)) or 
+		(item.UserName == null or isEmpty(item.UserName)) or 
+		(item.EmpId == null or isEmpty(item.EmpId)) or
+		((isEmpty(item.EmploymentDetail.HireDate)) or item.EmploymentDetail.HireDate > (now() as Date)) 
+		
+		or 
+		(item.EmploymentDetail.Active == false and !(vars.userEmployeeNumbers.EmployeeNumber contains item.EmpId))
+		)
+)
+---
+{
+	invalidWorkersData: partitioned[0],
+	validWorkersData: partitioned[1]
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables />
+		</ee:transform>
+		<ee:transform doc:name="Initializing Variables" doc:id="2bfbfc66-fcf3-4407-96d7-f79334b35316" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="validWorkers" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.validWorkersData]]></ee:set-variable>
+				<ee:set-variable variableName="invalidWorkers" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.invalidWorkersData]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<!-- [STUDIO:"filter for 1 user"]<ee:transform doc:name="filter for 1 user" doc:id="d7391bba-f2ba-4d70-a904-4eab38218d5e" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="validWorkers" ><![CDATA[%dw 2.0
+output application/json
+&#45;&#45;-
+vars.validWorkers filter($.EmpId == '10556')&#93;&#93;></ee:set-variable>
+			</ee:variables>
+		</ee:transform> [STUDIO] -->
+	</sub-flow>
+	
+	
+</mule>
